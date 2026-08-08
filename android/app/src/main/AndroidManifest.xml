@@ -30,6 +30,8 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <!-- Required for requesting battery optimization exemption -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Required for the focusable Flutter bookkeeping panel displayed over payment apps. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- Required for biometric authentication -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     
@@ -74,6 +76,20 @@
                 <data android:scheme="beecount"/>
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".accessibilitybilling.AccessibilityBillingService"
+            android:enabled="true"
+            android:exported="true"
+            android:label="@string/accessibility_billing_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_billing_service_config" />
+        </service>
 
         <!-- Image cropper activity -->
         <activity

@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.core.content.FileProvider
+import com.tntlikely.beecount.accessibilitybilling.AccessibilityBillingBridge
 import java.io.File
 import java.io.FileInputStream
 import io.flutter.embedding.android.FlutterFragmentActivity
@@ -26,6 +27,7 @@ class MainActivity: FlutterFragmentActivity() {
     private val SHARE_CHANNEL = "com.tntlikely.beecount/share"
 
     private var screenshotObserver: ScreenshotObserver? = null
+    private var accessibilityBillingBridge: AccessibilityBillingBridge? = null
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
@@ -132,6 +134,12 @@ class MainActivity: FlutterFragmentActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        accessibilityBillingBridge?.close()
+        accessibilityBillingBridge = AccessibilityBillingBridge(
+            this,
+            flutterEngine.dartExecutor.binaryMessenger,
+        )
 
         android.util.Log.e("MainActivity", "==========================================")
         android.util.Log.e("MainActivity", "configureFlutterEngine 被调用！！！")
@@ -548,8 +556,10 @@ class MainActivity: FlutterFragmentActivity() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
+        accessibilityBillingBridge?.close()
+        accessibilityBillingBridge = null
         stopScreenshotObserver()
+        super.onDestroy()
     }
 
     private fun installApkWithIntent(filePath: String): Boolean {

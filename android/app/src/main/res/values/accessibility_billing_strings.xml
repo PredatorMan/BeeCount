@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_billing_service_label">无障碍记账</string>
+    <string name="accessibility_billing_service_description">识别微信和支付宝的支付完成页面，并交由用户在蜜蜂记账中确认。不会点击第三方应用或自动保存账单。</string>
+</resources>
