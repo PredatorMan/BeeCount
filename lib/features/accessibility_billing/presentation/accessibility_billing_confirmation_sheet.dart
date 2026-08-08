@@ -475,17 +475,14 @@ class _AccessibilityBillingConfirmationSheetState
       0.0,
       size.height - bottomInset - safePadding,
     );
-    final desiredPanelHeight = math.max(420.0, size.height * 0.46);
+    final desiredPanelHeight = math.max(424.0, size.height * 0.46);
     final panelHeight = math.min(
-      480.0,
+      484.0,
       math.min(desiredPanelHeight, availableHeight),
     );
-    final redForIncome = ref.watch(incomeExpenseColorSchemeProvider);
     final amountColor = switch (_draft.type) {
-      BillingDraftType.income =>
-        redForIncome ? Colors.red.shade600 : Colors.green.shade700,
-      BillingDraftType.expense =>
-        redForIncome ? Colors.green.shade700 : Colors.red.shade600,
+      BillingDraftType.income => Colors.green.shade700,
+      BillingDraftType.expense => Colors.red.shade600,
       BillingDraftType.transfer => theme.colorScheme.primary,
     };
     final account = _findById(_accounts, _draft.accountId);
@@ -675,10 +672,17 @@ class _AccessibilityBillingConfirmationSheetState
                                 enabled: !_saving,
                                 maxLength: 100,
                                 maxLines: 1,
-                                style: const TextStyle(fontSize: 14),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: theme.colorScheme.primary,
+                                ),
                                 decoration: InputDecoration(
                                   counterText: '',
                                   hintText: _draft.merchant ?? '备注',
+                                  hintStyle: TextStyle(
+                                    color: theme.colorScheme.primary
+                                        .withValues(alpha: 0.8),
+                                  ),
                                   border: InputBorder.none,
                                   contentPadding: EdgeInsets.zero,
                                   isDense: true,
@@ -700,8 +704,13 @@ class _AccessibilityBillingConfirmationSheetState
                                   color: amountColor,
                                   fontWeight: FontWeight.w600,
                                 ),
-                                decoration: const InputDecoration(
+                                decoration: InputDecoration(
                                   prefixText: '¥ ',
+                                  prefixStyle:
+                                      theme.textTheme.titleLarge?.copyWith(
+                                    color: amountColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                   border: InputBorder.none,
                                   contentPadding: EdgeInsets.zero,
                                   isDense: true,
@@ -713,14 +722,13 @@ class _AccessibilityBillingConfirmationSheetState
                       ),
                       const SizedBox(height: 4),
                       SizedBox(
-                        height: 42,
+                        height: 46,
                         child: Row(
                           children: [
                             if (_draft.type != BillingDraftType.transfer) ...[
                               Expanded(
                                 flex: 3,
                                 child: _CompactOption(
-                                  icon: Icons.account_balance_wallet_outlined,
                                   label: account?.name ?? '资产',
                                   selected: account != null,
                                   onTap: () => _selectAccount(target: false),
@@ -731,7 +739,6 @@ class _AccessibilityBillingConfirmationSheetState
                             Expanded(
                               flex: 3,
                               child: _CompactOption(
-                                icon: Icons.menu_book_outlined,
                                 label: _ledger?.name ?? '选择账本',
                                 selected: _ledger != null,
                                 onTap: _selectLedger,
@@ -741,7 +748,6 @@ class _AccessibilityBillingConfirmationSheetState
                             const Expanded(
                               flex: 2,
                               child: _CompactOption(
-                                icon: Icons.schedule,
                                 label: '现在',
                               ),
                             ),
@@ -750,7 +756,6 @@ class _AccessibilityBillingConfirmationSheetState
                               Expanded(
                                 flex: 2,
                                 child: _CompactOption(
-                                  icon: Icons.receipt_long_outlined,
                                   label: '报销',
                                   selected: reimbursementSelected,
                                   onTap: _toggleReimbursement,
@@ -919,14 +924,14 @@ class _BillingTypeSwitcher extends StatelessWidget {
 
 class _CompactOption extends StatelessWidget {
   const _CompactOption({
-    required this.icon,
+    this.icon,
     this.label,
     this.tooltip,
     this.selected = false,
     this.onTap,
   });
 
-  final IconData icon;
+  final IconData? icon;
   final String? label;
   final String? tooltip;
   final bool selected;
@@ -948,18 +953,17 @@ class _CompactOption extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 17, color: foreground),
-              if (label != null) ...[
-                const SizedBox(width: 3),
+              if (icon != null) Icon(icon, size: 20, color: foreground),
+              if (icon != null && label != null) const SizedBox(width: 3),
+              if (label != null)
                 Flexible(
                   child: Text(
                     label!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 13, color: foreground),
+                    style: TextStyle(fontSize: 14, color: foreground),
                   ),
                 ),
-              ],
             ],
           ),
         ),

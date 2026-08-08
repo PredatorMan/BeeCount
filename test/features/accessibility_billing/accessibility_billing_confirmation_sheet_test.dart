@@ -73,6 +73,15 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(find.byIcon(Icons.account_balance_wallet_outlined), findsNothing);
+    expect(find.byIcon(Icons.menu_book_outlined), findsNothing);
+    expect(find.byIcon(Icons.schedule), findsNothing);
+    final fields =
+        tester.widgetList<TextField>(find.byType(TextField)).toList();
+    final primary =
+        Theme.of(tester.element(find.byType(GridView))).colorScheme.primary;
+    expect(fields.first.style?.color, primary);
+    expect(fields[1].style?.color, Colors.red.shade600);
     final gridRect = tester.getRect(grid);
     for (var index = 1; index <= 15; index++) {
       final label = find.text('分类${index.toString().padLeft(2, '0')}');
