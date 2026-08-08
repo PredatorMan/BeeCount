@@ -209,6 +209,10 @@ dependencies {
     // Java language desugaring support for older Android devices.
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
 
+    // AndroidManifest references Theme.AppCompat for the existing uCrop activity.
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+
     // Required by uCrop 2.2.11 (bundled with image_cropper 10.0.0) for downloading image URIs
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    testImplementation 'junit:junit:4.13.2'
 }
