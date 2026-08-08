@@ -1,0 +1,165 @@
+import 'package:beecount/data/db.dart';
+import 'package:beecount/data/repositories/local/local_repository.dart';
+import 'package:beecount/features/accessibility_billing/domain/billing_draft.dart';
+import 'package:beecount/features/accessibility_billing/presentation/accessibility_billing_confirmation_sheet.dart';
+import 'package:beecount/providers.dart';
+import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late BeeDatabase database;
+  late LocalRepository repository;
+  late int ledgerId;
+  late int accountId;
+
+  setUp(() async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    database = BeeDatabase.forTesting(NativeDatabase.memory());
+    repository = LocalRepository(database);
+    ledgerId = await repository.createLedger(
+      name: '家庭日常消费与旅行共同账本',
+      currency: 'CNY',
+    );
+    accountId = await repository.createAccount(
+      ledgerId: ledgerId,
+      name: '中国银行储蓄卡尾号5912超长资产',
+    );
+    for (var index = 1; index <= 20; index++) {
+      await repository.createCategory(
+        name: '分类${index.toString().padLeft(2, '0')}',
+        kind: 'expense',
+        sortOrder: index,
+      );
+    }
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setInt('default_expense_account_id', accountId);
+  });
+
+  tearDown(() async {
+    await database.close();
+  });
+
+  testWidgets('常见屏幕首屏显示三排分类，且滚动不移动固定编辑区', (tester) async {
+    await _setTestViewport(tester, const Size(393, 852));
+    await _pumpConfirmationSheet(
+      tester,
+      repository: repository,
+      ledgerId: ledgerId,
+    );
+
+    final grid = find.byType(GridView);
+    expect(grid, findsOneWidget);
+    expect(find.byType(Divider), findsNothing);
+    expect(find.textContaining('识别到支付方式'), findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Container &&
+            widget.constraints ==
+                const BoxConstraints.tightFor(width: 36, height: 4),
+        description: '顶部拖动条',
+      ),
+      findsNothing,
+    );
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is ColoredBox && widget.color == Colors.white,
+        description: '白色面板背景',
+      ),
+      findsOneWidget,
+    );
+    final gridRect = tester.getRect(grid);
+    for (var index = 1; index <= 15; index++) {
+      final label = find.text('分类${index.toString().padLeft(2, '0')}');
+      expect(label, findsOneWidget);
+      final labelRect = tester.getRect(label);
+      expect(labelRect.top, greaterThanOrEqualTo(gridRect.top));
+      expect(labelRect.bottom, lessThanOrEqualTo(gridRect.bottom + 0.5));
+    }
+
+    final fixedBefore = _fixedControlTops(tester);
+    await tester.drag(grid, const Offset(0, -120));
+    await tester.pump();
+    expect(_fixedControlTops(tester), fixedBefore);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('小屏和大字下超长资产、账本名不造成布局溢出', (tester) async {
+    await _setTestViewport(tester, const Size(360, 720));
+    await _pumpConfirmationSheet(
+      tester,
+      repository: repository,
+      ledgerId: ledgerId,
+      textScaler: const TextScaler.linear(1.3),
+    );
+
+    expect(find.text('中国银行储蓄卡尾号5912超长资产'), findsOneWidget);
+    expect(find.text('家庭日常消费与旅行共同账本'), findsOneWidget);
+    expect(find.text('取消'), findsOneWidget);
+    expect(find.text('保存'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+Future<void> _setTestViewport(WidgetTester tester, Size size) async {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = size;
+  addTearDown(tester.view.resetDevicePixelRatio);
+  addTearDown(tester.view.resetPhysicalSize);
+}
+
+Future<void> _pumpConfirmationSheet(
+  WidgetTester tester, {
+  required LocalRepository repository,
+  required int ledgerId,
+  TextScaler textScaler = TextScaler.noScaling,
+}) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        repositoryProvider.overrideWithValue(repository),
+        currentLedgerIdProvider.overrideWith((ref) => ledgerId),
+      ],
+      child: MaterialApp(
+        theme: ThemeData.light(),
+        home: MediaQuery(
+          data: MediaQueryData(
+            size: tester.view.physicalSize,
+            padding: const EdgeInsets.only(bottom: 24),
+            textScaler: textScaler,
+          ),
+          child: Scaffold(
+            body: Align(
+              alignment: Alignment.bottomCenter,
+              child: AccessibilityBillingConfirmationSheet(
+                initialDraft: BillingDraft(
+                  amount: 92,
+                  merchant: '扫二维码付款',
+                  note: '扫二维码付款',
+                  happenedAt: DateTime(2026, 8, 8, 12),
+                  paymentMethod: '中国银行储蓄卡(5912)',
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+List<double> _fixedControlTops(WidgetTester tester) {
+  final fields = find.byType(TextField);
+  return <double>[
+    tester.getTopLeft(fields.at(0)).dy,
+    tester.getTopLeft(fields.at(1)).dy,
+    tester.getTopLeft(find.widgetWithText(OutlinedButton, '取消')).dy,
+    tester.getTopLeft(find.widgetWithText(FilledButton, '保存')).dy,
+  ];
+}
