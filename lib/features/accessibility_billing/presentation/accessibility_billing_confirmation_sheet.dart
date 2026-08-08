@@ -35,7 +35,9 @@ Future<AccessibilityBillingConfirmationResult?>
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    backgroundColor: Theme.of(context).colorScheme.surface,
+    enableDrag: false,
+    backgroundColor: Colors.white,
+    barrierColor: Colors.black45,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -473,9 +475,10 @@ class _AccessibilityBillingConfirmationSheetState
       0.0,
       size.height - bottomInset - safePadding,
     );
+    final desiredPanelHeight = math.max(420.0, size.height * 0.46);
     final panelHeight = math.min(
-      620.0,
-      math.min(size.height * 0.54, availableHeight),
+      480.0,
+      math.min(desiredPanelHeight, availableHeight),
     );
     final redForIncome = ref.watch(incomeExpenseColorSchemeProvider);
     final amountColor = switch (_draft.type) {
@@ -497,163 +500,145 @@ class _AccessibilityBillingConfirmationSheetState
     return AnimatedPadding(
       duration: const Duration(milliseconds: 120),
       padding: EdgeInsets.only(bottom: bottomInset),
-      child: SizedBox(
-        height: panelHeight,
-        child: Column(
-          children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-              child: Row(
-                children: [
-                  Tooltip(
-                    message: _draft.sourcePackage == null
-                        ? '账单来源'
-                        : _sourceLabel(_draft.sourcePackage!),
-                    child: CircleAvatar(
-                      radius: 18,
-                      backgroundColor:
-                          theme.colorScheme.primary.withValues(alpha: 0.12),
-                      child: Icon(
-                        _draft.sourcePackage == 'com.tencent.mm'
-                            ? Icons.chat_bubble
-                            : Icons.account_balance_wallet,
-                        color: theme.colorScheme.primary,
-                        size: 20,
+      child: ColoredBox(
+        color: Colors.white,
+        child: SizedBox(
+          height: panelHeight,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                child: Row(
+                  children: [
+                    Tooltip(
+                      message: _draft.sourcePackage == null
+                          ? '账单来源'
+                          : _sourceLabel(_draft.sourcePackage!),
+                      child: CircleAvatar(
+                        radius: 16,
+                        backgroundColor:
+                            theme.colorScheme.primary.withValues(alpha: 0.12),
+                        child: Icon(
+                          _draft.sourcePackage == 'com.tencent.mm'
+                              ? Icons.chat_bubble
+                              : Icons.account_balance_wallet,
+                          color: theme.colorScheme.primary,
+                          size: 18,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: SegmentedButton<BillingDraftType>(
-                      showSelectedIcon: false,
-                      segments: const [
-                        ButtonSegment(
-                          value: BillingDraftType.expense,
-                          label: Text('支出'),
-                        ),
-                        ButtonSegment(
-                          value: BillingDraftType.income,
-                          label: Text('收入'),
-                        ),
-                        ButtonSegment(
-                          value: BillingDraftType.transfer,
-                          label: Text('转账'),
-                        ),
-                      ],
-                      selected: {_draft.type},
-                      onSelectionChanged:
-                          _saving ? null : (value) => _changeType(value.single),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _BillingTypeSwitcher(
+                        value: _draft.type,
+                        enabled: !_saving,
+                        onChanged: _changeType,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  IconButton(
-                    tooltip: '反馈识别问题',
-                    onPressed: _saving
-                        ? null
-                        : () => ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('可在无障碍记账设置中采集诊断快照')),
-                            ),
-                    icon: const Icon(Icons.feedback_outlined),
-                  ),
-                ],
+                    const SizedBox(width: 4),
+                    SizedBox.square(
+                      dimension: 36,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        tooltip: '反馈识别问题',
+                        onPressed: _saving
+                            ? null
+                            : () => ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('可在无障碍记账设置中采集诊断快照'),
+                                  ),
+                                ),
+                        icon: const Icon(Icons.feedback_outlined, size: 21),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (_loadingChoices)
-                      const Expanded(
-                        child: Align(
-                          alignment: Alignment.topCenter,
-                          child: LinearProgressIndicator(),
-                        ),
-                      )
-                    else if (_draft.type != BillingDraftType.transfer)
-                      Expanded(
-                        child: GridView.builder(
-                          padding: EdgeInsets.zero,
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 5,
-                            mainAxisSpacing: 10,
-                            crossAxisSpacing: 6,
-                            childAspectRatio: 0.82,
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_loadingChoices)
+                        const Expanded(
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: LinearProgressIndicator(),
                           ),
-                          itemCount: _categories.length,
-                          itemBuilder: (context, index) {
-                            final category = _categories[index];
-                            final selected = _draft.categoryId == category.id;
-                            return InkWell(
-                              borderRadius: BorderRadius.circular(8),
-                              onTap: _saving
-                                  ? null
-                                  : () => setState(() {
-                                        _draft = _draft.copyWith(
-                                          categoryId: category.id,
-                                        );
-                                      }),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 42,
-                                    height: 42,
-                                    decoration: BoxDecoration(
-                                      color: selected
-                                          ? theme.colorScheme.primary
-                                              .withValues(alpha: 0.14)
-                                          : BeeTokens.surfaceCategoryIcon(
-                                              context),
-                                      shape: BoxShape.circle,
+                        )
+                      else if (_draft.type != BillingDraftType.transfer)
+                        Expanded(
+                          child: GridView.builder(
+                            padding: EdgeInsets.zero,
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 5,
+                              mainAxisSpacing: 4,
+                              crossAxisSpacing: 4,
+                              mainAxisExtent: 62,
+                            ),
+                            itemCount: _categories.length,
+                            itemBuilder: (context, index) {
+                              final category = _categories[index];
+                              final selected = _draft.categoryId == category.id;
+                              return InkWell(
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: _saving
+                                    ? null
+                                    : () => setState(() {
+                                          _draft = _draft.copyWith(
+                                            categoryId: category.id,
+                                          );
+                                        }),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: selected
+                                            ? theme.colorScheme.primary
+                                                .withValues(alpha: 0.12)
+                                            : Colors.transparent,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: CategoryIconWidget(
+                                        category: category,
+                                        size: 21,
+                                        color: selected
+                                            ? theme.colorScheme.primary
+                                            : BeeTokens.iconCategory(context),
+                                        circular: true,
+                                      ),
                                     ),
-                                    alignment: Alignment.center,
-                                    child: CategoryIconWidget(
-                                      category: category,
-                                      size: 22,
-                                      color: selected
-                                          ? theme.colorScheme.primary
-                                          : BeeTokens.iconCategory(context),
-                                      circular: true,
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      category.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        height: 1,
+                                        color: selected
+                                            ? theme.colorScheme.primary
+                                            : BeeTokens.textPrimary(context),
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    category.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: selected
-                                          ? theme.colorScheme.primary
-                                          : BeeTokens.textPrimary(context),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      )
-                    else
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text('转账资产', style: theme.textTheme.titleSmall),
-                            const SizedBox(height: 8),
-                            Row(
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        )
+                      else
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: Row(
                               children: [
                                 Expanded(
                                   child: _QuickOption(
@@ -677,131 +662,161 @@ class _AccessibilityBillingConfirmationSheetState
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                          ),
+                        ),
+                      const SizedBox(height: 4),
+                      SizedBox(
+                        height: 40,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _noteController,
+                                enabled: !_saving,
+                                maxLength: 100,
+                                maxLines: 1,
+                                style: const TextStyle(fontSize: 14),
+                                decoration: InputDecoration(
+                                  counterText: '',
+                                  hintText: _draft.merchant ?? '备注',
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.zero,
+                                  isDense: true,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 104,
+                              child: TextField(
+                                controller: _amountController,
+                                enabled: !_saving,
+                                textAlign: TextAlign.end,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                  decimal: true,
+                                ),
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  color: amountColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                decoration: const InputDecoration(
+                                  prefixText: '¥ ',
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.zero,
+                                  isDense: true,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                    const Divider(height: 20),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _noteController,
-                            enabled: !_saving,
-                            maxLength: 100,
-                            decoration: InputDecoration(
-                              counterText: '',
-                              hintText: _draft.merchant ?? '备注',
-                              border: InputBorder.none,
-                              isDense: true,
+                      const SizedBox(height: 4),
+                      SizedBox(
+                        height: 42,
+                        child: Row(
+                          children: [
+                            if (_draft.type != BillingDraftType.transfer) ...[
+                              Expanded(
+                                flex: 3,
+                                child: _CompactOption(
+                                  icon: Icons.account_balance_wallet_outlined,
+                                  label: account?.name ?? '资产',
+                                  selected: account != null,
+                                  onTap: () => _selectAccount(target: false),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                            ],
+                            Expanded(
+                              flex: 3,
+                              child: _CompactOption(
+                                icon: Icons.menu_book_outlined,
+                                label: _ledger?.name ?? '选择账本',
+                                selected: _ledger != null,
+                                onTap: _selectLedger,
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 4),
+                            const Expanded(
+                              flex: 2,
+                              child: _CompactOption(
+                                icon: Icons.schedule,
+                                label: '现在',
+                              ),
+                            ),
+                            if (reimbursement != null) ...[
+                              const SizedBox(width: 4),
+                              Expanded(
+                                flex: 2,
+                                child: _CompactOption(
+                                  icon: Icons.receipt_long_outlined,
+                                  label: '报销',
+                                  selected: reimbursementSelected,
+                                  onTap: _toggleReimbursement,
+                                ),
+                              ),
+                            ],
+                            const SizedBox(width: 4),
+                            SizedBox(
+                              width: 36,
+                              child: _CompactOption(
+                                icon: Icons.flag_outlined,
+                                tooltip: '更多选项',
+                                selected: _draft.excludeFromStats ||
+                                    _draft.excludeFromBudget ||
+                                    _draft.tagIds.isNotEmpty,
+                                onTap: _showMoreOptions,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          width: 128,
-                          child: TextField(
-                            controller: _amountController,
-                            enabled: !_saving,
-                            textAlign: TextAlign.end,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              color: amountColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            decoration: InputDecoration(
-                              prefixText: '¥ ',
-                              border: InputBorder.none,
-                              isDense: true,
-                            ),
+                      ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          _error!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.error,
                           ),
                         ),
                       ],
-                    ),
-                    const Divider(height: 20),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        if (_draft.type != BillingDraftType.transfer)
-                          _QuickOption(
-                            icon: Icons.account_balance_wallet_outlined,
-                            label: account?.name ?? '资产',
-                            selected: account != null,
-                            onTap: () => _selectAccount(target: false),
-                          ),
-                        _QuickOption(
-                          icon: Icons.menu_book_outlined,
-                          label: _ledger?.name ?? '选择账本',
-                          selected: _ledger != null,
-                          onTap: _selectLedger,
-                        ),
-                        const _QuickOption(
-                          icon: Icons.schedule,
-                          label: '现在',
-                        ),
-                        if (reimbursement != null)
-                          _QuickOption(
-                            icon: Icons.receipt_long_outlined,
-                            label: '报销',
-                            selected: reimbursementSelected,
-                            onTap: _toggleReimbursement,
-                          ),
-                        _QuickOption(
-                          icon: Icons.flag_outlined,
-                          label: '更多',
-                          selected: _draft.excludeFromStats ||
-                              _draft.excludeFromBudget ||
-                              _draft.tagIds.isNotEmpty,
-                          onTap: _showMoreOptions,
-                        ),
-                      ],
-                    ),
-                    if (_draft.paymentMethod != null) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        '识别到支付方式：${_draft.paymentMethod}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: BeeTokens.textTertiary(context),
-                        ),
-                      ),
                     ],
-                    if (_error != null) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        _error!,
-                        style: TextStyle(color: theme.colorScheme.error),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _saving ? null : () => Navigator.pop(context),
-                      child: const Text('取消'),
+              SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+                  child: SizedBox(
+                    height: 44,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed:
+                                _saving ? null : () => Navigator.pop(context),
+                            child: const Text('取消'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: _saving ? null : _save,
+                            child: Text(_saving ? '保存中' : '保存'),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: _saving ? null : _save,
-                      child: Text(_saving ? '保存中' : '保存'),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -838,6 +853,122 @@ class _AccessibilityBillingConfirmationSheetState
         'com.eg.android.AlipayGphone' => '支付宝',
         _ => packageName,
       };
+}
+
+class _BillingTypeSwitcher extends StatelessWidget {
+  const _BillingTypeSwitcher({
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final BillingDraftType value;
+  final bool enabled;
+  final ValueChanged<BillingDraftType> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    return Container(
+      height: 38,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F4F5),
+        borderRadius: BorderRadius.circular(19),
+      ),
+      child: Row(
+        children: BillingDraftType.values.map((type) {
+          final selected = type == value;
+          final label = switch (type) {
+            BillingDraftType.expense => '支出',
+            BillingDraftType.income => '收入',
+            BillingDraftType.transfer => '转账',
+          };
+          return Expanded(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(17),
+                onTap: enabled && !selected ? () => onChanged(type) : null,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 140),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? primary.withValues(alpha: 0.12)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(17),
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                      color: selected ? primary : const Color(0xFF303036),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _CompactOption extends StatelessWidget {
+  const _CompactOption({
+    required this.icon,
+    this.label,
+    this.tooltip,
+    this.selected = false,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String? label;
+  final String? tooltip;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final foreground = selected ? primary : BeeTokens.textSecondary(context);
+    final content = Material(
+      color:
+          selected ? primary.withValues(alpha: 0.1) : const Color(0xFFF5F5F6),
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 17, color: foreground),
+              if (label != null) ...[
+                const SizedBox(width: 3),
+                Flexible(
+                  child: Text(
+                    label!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 13, color: foreground),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+    return tooltip == null
+        ? content
+        : Tooltip(message: tooltip!, child: content);
+  }
 }
 
 class _QuickOption extends StatelessWidget {
