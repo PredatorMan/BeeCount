@@ -33,6 +33,7 @@ import 'services/security/app_lock_service.dart';
 import 'providers/security_providers.dart';
 import 'styles/tokens.dart';
 import 'providers/avatar_providers.dart';
+import 'features/accessibility_billing/accessibility_billing_refresh_coordinator.dart';
 
 class BeeApp extends ConsumerStatefulWidget {
   const BeeApp({super.key});
@@ -734,6 +735,13 @@ class _BeeAppState extends ConsumerState<BeeApp>
     } else if (state == AppLifecycleState.resumed) {
       // 移除隐私模糊屏
       ref.read(showPrivacyScreenProvider.notifier).state = false;
+      // 浮窗由独立 Flutter engine 写数据库。即使保存事件发生在主 engine
+      // 暂停或页面尚未挂载时，回到前台也要让主 Drift connection 重新查询。
+      if (Platform.isAndroid) {
+        ref.read(accessibilityBillingRefreshActionProvider)(
+          ref.read(currentLedgerIdProvider),
+        );
+      }
       // 检查是否需要锁定
       _checkAppLockOnResume();
       // 当app从后台恢复到前台时，更新小组件数据

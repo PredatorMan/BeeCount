@@ -59,6 +59,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Stream<List<({Transaction t, Category? category, Account? account, Account? toAccount})>>?
       _txStream;
   int? _txStreamLedgerId;
+  int? _txStreamRefreshVersion;
 
   // 月初提醒状态
   bool _showLastMonthReminder = false;
@@ -623,6 +624,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     // 预加载数据（含标签、附件、账户，仅前 N 条）
     final cachedFullData = ref.watch(cachedTransactionsProvider);
     final ledgerId = ref.watch(currentLedgerIdProvider);
+    final transactionRefreshVersion = ref.watch(homeTransactionRefreshProvider);
     final month = ref.watch(selectedMonthProvider);
     final hide = ref.watch(hideAmountsProvider);
     final aiEnabledAsync = ref.watch(aiAssistantEnabledProvider);
@@ -653,16 +655,6 @@ class _HomePageState extends ConsumerState<HomePage> {
       if (previous != next) {
         _transactionListKey.currentState?.switchToStreamMode();
       }
-    });
-
-    ref.listen<int>(homeTransactionRefreshProvider, (previous, next) {
-      if (previous == next || !mounted) return;
-      _transactionListKey.currentState?.forceStreamModeImmediate();
-      setState(() {
-        _txStream = null;
-        _txStreamLedgerId = null;
-        _streamBuilderKey++;
-      });
     });
 
     // D 方案后:Drift JOIN + SharedLedger* table-watch 已经在 Repository 层
@@ -1043,14 +1035,19 @@ class _HomePageState extends ConsumerState<HomePage> {
           }),
           Expanded(
             child: StreamBuilder<List<({Transaction t, Category? category, Account? account, Account? toAccount})>>(
-              key: ValueKey('transactions_$_streamBuilderKey'), // 使用递增key强制重建
+              key: ValueKey(
+                'transactions_${ledgerId}_${transactionRefreshVersion}_$_streamBuilderKey',
+              ),
               stream: () {
                 // ledgerId 变了或第一次进来才重建 stream;无关 setState(预算
                 // 提示卡片、月度提醒等)的 home rebuild 复用同一 stream 引用,
                 // StreamBuilder 不会重新订阅,不会闪到 fallback 数据。
-                if (_txStream == null || _txStreamLedgerId != ledgerId) {
+                if (_txStream == null ||
+                    _txStreamLedgerId != ledgerId ||
+                    _txStreamRefreshVersion != transactionRefreshVersion) {
                   _txStream = repo.transactionsWithCategoryAll(ledgerId: ledgerId);
                   _txStreamLedgerId = ledgerId;
+                  _txStreamRefreshVersion = transactionRefreshVersion;
                 }
                 return _txStream;
               }(),
