@@ -128,7 +128,7 @@ class AIChatService {
           ? "You are BeeCount's AI assistant, mainly helping users with bookkeeping. "
               'If users ask about statistics, queries and other functions, please inform them that they are not supported yet and guide them to use the bookkeeping function. '
               'Please respond in English.'
-          : '你是蜜蜂记账的AI助手,主要帮助用户记账。'
+          : '你是橙汁记账的AI助手,主要帮助用户记账。'
               '如果用户询问统计、查询等功能,请告知暂不支持,引导用户使用记账功能。'
               '请用中文回复。';
 

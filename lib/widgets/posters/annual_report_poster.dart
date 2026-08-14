@@ -1711,7 +1711,7 @@ class AnnualReportPoster extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '扫码下载蜜蜂记账，开启你的记账之旅',
+            '扫码下载橙汁记账，开启你的记账之旅',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.5),
               fontSize: 12,

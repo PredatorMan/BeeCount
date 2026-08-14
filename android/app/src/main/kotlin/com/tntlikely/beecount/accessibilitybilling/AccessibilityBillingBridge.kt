@@ -24,7 +24,7 @@ import java.util.concurrent.Executors
 internal class AccessibilityBillingBridge(
     private val context: Context,
     messenger: BinaryMessenger,
-) : RecognitionEventStore.Listener {
+) : RecognitionEventStore.Listener, AccessibilityBillingTransactionCoordinator.Listener {
     private val channel = MethodChannel(messenger, CHANNEL_NAME)
     private val preferences = AccessibilityBillingPreferences(context.applicationContext)
     private val eventStore = RecognitionEventStore(context.applicationContext)
@@ -33,15 +33,27 @@ internal class AccessibilityBillingBridge(
     init {
         channel.setMethodCallHandler(::handleMethodCall)
         RecognitionEventStore.addListener(this)
+        AccessibilityBillingTransactionCoordinator.addListener(this)
     }
 
     fun close() {
         RecognitionEventStore.removeListener(this)
+        AccessibilityBillingTransactionCoordinator.removeListener(this)
         channel.setMethodCallHandler(null)
     }
 
     override fun onRecognitionQueued(recognition: PaymentRecognition) {
         channel.invokeMethod(EVENT_TRANSACTION_DETECTED, recognition.toMap())
+    }
+
+    override fun onTransactionSaved(ledgerId: Int, transactionId: Int) {
+        channel.invokeMethod(
+            EVENT_TRANSACTION_SAVED,
+            mapOf(
+                "ledgerId" to ledgerId,
+                "transactionId" to transactionId,
+            ),
+        )
     }
 
     private fun handleMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -54,13 +66,15 @@ internal class AccessibilityBillingBridge(
             "updateSettings" -> {
                 call.argument<Boolean>("masterEnabled")?.let {
                     preferences.masterEnabled = it
-                    if (!it) AccessibilityBillingOverlayCoordinator.requestDismiss()
+                    AccessibilityBillingOverlayCoordinator.requestRecognitionReset()
                 }
                 call.argument<Boolean>("wechatEnabled")?.let {
                     preferences.setPackageEnabled(AccessibilityBillingPreferences.WECHAT_PACKAGE, it)
+                    AccessibilityBillingOverlayCoordinator.requestRecognitionReset()
                 }
                 call.argument<Boolean>("alipayEnabled")?.let {
                     preferences.setPackageEnabled(AccessibilityBillingPreferences.ALIPAY_PACKAGE, it)
+                    AccessibilityBillingOverlayCoordinator.requestRecognitionReset()
                 }
                 (call.argument<Boolean>("autoExtractNote")
                     ?: call.argument<Boolean>("autoExtractNotes"))?.let {
@@ -69,6 +83,7 @@ internal class AccessibilityBillingBridge(
                 call.argument<Map<*, *>>("packageEnabled")?.forEach { (packageName, enabled) ->
                     if (packageName is String && enabled is Boolean) {
                         preferences.setPackageEnabled(packageName, enabled)
+                        AccessibilityBillingOverlayCoordinator.requestRecognitionReset()
                     }
                 }
                 result.success(null)
@@ -78,7 +93,14 @@ internal class AccessibilityBillingBridge(
                 UPDATE_EXECUTOR.execute {
                     val updateResult = ruleRepository.updateFromRemote()
                     val response = ruleContractMap() + updateResult
-                    MAIN_HANDLER.post { result.success(response) }
+                    MAIN_HANDLER.post {
+                        if (updateResult["error"] == null) {
+                            // Returning from the settings page must evaluate the bill with the
+                            // newly active rules, not inherit suppression from the old session.
+                            AccessibilityBillingOverlayCoordinator.requestRecognitionReset()
+                        }
+                        result.success(response)
+                    }
                 }
             }
             "setRecognitionPackageEnabled" -> {
@@ -88,7 +110,11 @@ internal class AccessibilityBillingBridge(
                 if (app == null || enabled == null) {
                     result.error("INVALID_ARGUMENT", "Known packageName and enabled are required", null)
                 } else {
-                    result.success(preferences.setPackageEnabled(app.packageName, enabled))
+                    val updated = preferences.setPackageEnabled(app.packageName, enabled)
+                    if (updated && !enabled) {
+                        AccessibilityBillingOverlayCoordinator.requestRecognitionReset()
+                    }
+                    result.success(updated)
                 }
             }
             "getOverlayPermissionStatus" -> result.success(canDrawOverlays())
@@ -113,7 +139,9 @@ internal class AccessibilityBillingBridge(
                 if (id == null) {
                     result.error("INVALID_ARGUMENT", "id is required", null)
                 } else {
-                    result.success(eventStore.acknowledge(id))
+                    val acknowledged = eventStore.acknowledge(id)
+                    if (acknowledged) AccessibilityBillingOverlayCoordinator.requestSuppressCurrentPage()
+                    result.success(acknowledged)
                 }
             }
             "clearPendingTransactions" -> {
@@ -125,11 +153,19 @@ internal class AccessibilityBillingBridge(
                 AccessibilityBillingOverlayCoordinator.requestDismiss()
                 result.success(null)
             }
-            "captureDiagnosticSnapshot" -> {
-                val savedPath = runCatching {
-                    AccessibilityBillingDiagnostics.saveLatest(context)
-                }.getOrNull()
-                result.success(savedPath != null)
+            "notifyTransactionSaved" -> {
+                val ledgerId = call.argument<Number>("ledgerId")?.toInt()
+                val transactionId = call.argument<Number>("transactionId")?.toInt()
+                if (ledgerId == null || ledgerId <= 0 || transactionId == null || transactionId <= 0) {
+                    result.error(
+                        "INVALID_ARGUMENT",
+                        "Positive ledgerId and transactionId are required",
+                        null,
+                    )
+                } else {
+                    AccessibilityBillingTransactionCoordinator.notifySaved(ledgerId, transactionId)
+                    result.success(null)
+                }
             }
             else -> result.notImplemented()
         }
@@ -139,7 +175,6 @@ internal class AccessibilityBillingBridge(
         val notificationStatus = notificationStatusMap()
         return preferences.statusMap() + mapOf(
             "serviceEnabled" to isServiceEnabled(),
-            "diagnosticsSupported" to true,
             "overlayPermissionGranted" to canDrawOverlays(),
             "batteryOptimizationIgnored" to isIgnoringBatteryOptimizations(),
             "notificationsEnabled" to notificationStatus.getValue("enabled"),
@@ -312,6 +347,7 @@ internal class AccessibilityBillingBridge(
     companion object {
         const val CHANNEL_NAME = "com.tntlikely.beecount/accessibility_billing"
         const val EVENT_TRANSACTION_DETECTED = "onTransactionDetected"
+        const val EVENT_TRANSACTION_SAVED = "onTransactionSaved"
         private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 4812
         private val MAIN_HANDLER = Handler(Looper.getMainLooper())
         private val UPDATE_EXECUTOR = Executors.newSingleThreadExecutor { runnable ->

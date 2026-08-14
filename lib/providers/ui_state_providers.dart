@@ -42,6 +42,9 @@ final homeScrollToTopProvider = StateProvider<int>((ref) => 0);
 // 首页切换到 Stream 模式触发器（用户交互时触发）
 final homeSwitchToStreamProvider = StateProvider<int>((ref) => 0);
 
+// Rebuilds Home's transaction stream after another Flutter engine writes data.
+final homeTransactionRefreshProvider = StateProvider<int>((ref) => 0);
+
 // Currently selected month (first day), default to now
 final selectedMonthProvider = StateProvider<DateTime>((ref) {
   final now = DateTime.now();

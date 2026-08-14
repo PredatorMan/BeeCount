@@ -3,15 +3,14 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../ai/core/bill_info.dart';
-import '../../../data/category_node.dart';
 import '../../../data/db.dart';
+import '../../../data/repositories/local/local_repository.dart';
 import '../../../providers.dart';
 import '../../../providers/budget_providers.dart';
-import '../../../services/billing/bill_creation_service.dart';
 import '../../../services/billing/category_matcher.dart';
 import '../../../services/billing/post_processor.dart';
 import '../../../styles/tokens.dart';
+import '../../../utils/shared_ledger_picker_filter.dart';
 import '../../../widgets/biz/ledger_selector_dialog.dart';
 import '../../../widgets/category_icon.dart';
 import '../domain/billing_draft.dart';
@@ -24,6 +23,34 @@ class AccessibilityBillingConfirmationResult {
     required this.transactionId,
     required this.draft,
   });
+}
+
+class _CategoryChoices {
+  const _CategoryChoices({
+    this.topLevel = const [],
+    this.children = const {},
+  });
+
+  final List<Category> topLevel;
+  final Map<int, List<Category>> children;
+
+  List<Category> get usable => [
+        for (final category in topLevel)
+          if (children[category.id]?.isNotEmpty == true)
+            ...children[category.id]!
+          else
+            category,
+      ];
+
+  int? parentIdFor(int? categoryId) {
+    if (categoryId == null) return null;
+    for (final entry in children.entries) {
+      if (entry.value.any((category) => category.id == categoryId)) {
+        return entry.key;
+      }
+    }
+    return null;
+  }
 }
 
 Future<AccessibilityBillingConfirmationResult?>
@@ -70,12 +97,15 @@ class _AccessibilityBillingConfirmationSheetState
   late final TextEditingController _noteController;
 
   List<Category> _categories = const [];
+  List<Category> _topLevelCategories = const [];
+  Map<int, List<Category>> _subCategories = const {};
   List<Account> _accounts = const [];
   List<Tag> _tags = const [];
   Ledger? _ledger;
   bool _loadingChoices = true;
   bool _saving = false;
   String? _error;
+  int? _expandedCategoryId;
   int _loadGeneration = 0;
 
   @override
@@ -102,12 +132,11 @@ class _AccessibilityBillingConfirmationSheetState
     final generation = ++_loadGeneration;
     if (mounted) setState(() => _loadingChoices = true);
     final repo = ref.read(repositoryProvider);
-    final service = BillCreationService(repo);
     final ledgerId = _draft.ledgerId;
     final type = _draft.type;
     try {
       final results = await Future.wait<Object?>([
-        service.getCategoriesByType(type.name),
+        _loadCategories(type, ledgerId),
         repo.getAllTags(),
         ledgerId == null
             ? Future<List<Account>>.value(const [])
@@ -118,9 +147,8 @@ class _AccessibilityBillingConfirmationSheetState
         _defaultAccountIdFor(type),
       ]);
       if (!mounted || generation != _loadGeneration) return;
-      final categories = CategoryHierarchy.getUsableCategories(
-        results[0] as List<Category>,
-      );
+      final categoryChoices = results[0] as _CategoryChoices;
+      final categories = categoryChoices.usable;
       final accounts = (results[2] as List<Account>)
           .where((account) => !account.hidden)
           .toList();
@@ -148,6 +176,9 @@ class _AccessibilityBillingConfirmationSheetState
       setState(() {
         _draft = nextDraft;
         _categories = categories;
+        _topLevelCategories = categoryChoices.topLevel;
+        _subCategories = categoryChoices.children;
+        _expandedCategoryId = categoryChoices.parentIdFor(nextDraft.categoryId);
         _tags = results[1] as List<Tag>;
         _accounts = accounts;
         _ledger = results[3] as Ledger?;
@@ -160,6 +191,47 @@ class _AccessibilityBillingConfirmationSheetState
         _error = '加载记账选项失败：$error';
       });
     }
+  }
+
+  Future<_CategoryChoices> _loadCategories(
+    BillingDraftType type,
+    int? ledgerId,
+  ) async {
+    if (type == BillingDraftType.transfer) {
+      return const _CategoryChoices();
+    }
+
+    final repo = ref.read(repositoryProvider);
+    final kind = type.name;
+    var topLevel = await repo.getTopLevelCategories(kind);
+    LedgerPickerContext? pickerContext;
+    if (repo is LocalRepository) {
+      pickerContext = await repo.db.loadLedgerPickerContext(ledgerId);
+      topLevel = await repo.db.filterCategoriesForLedger(
+        topLevel,
+        pickerContext,
+        kind: kind,
+      );
+    }
+
+    final children = <int, List<Category>>{};
+    final isSharedEditor = pickerContext?.isEditorInShared == true;
+    for (final category in topLevel) {
+      final subCategories = isSharedEditor &&
+              category.id < 0 &&
+              repo is LocalRepository &&
+              pickerContext?.ledgerSyncId != null
+          ? await repo.db.getSharedSubCategoriesBySyntheticParentId(
+              category.id,
+              pickerContext!.ledgerSyncId!,
+            )
+          : await repo.getSubCategories(category.id);
+      if (subCategories.isNotEmpty) {
+        children[category.id] = subCategories;
+      }
+    }
+
+    return _CategoryChoices(topLevel: topLevel, children: children);
   }
 
   Future<int?> _defaultAccountIdFor(BillingDraftType type) async {
@@ -188,6 +260,7 @@ class _AccessibilityBillingConfirmationSheetState
         accountId: null,
         toAccountId: null,
       );
+      _expandedCategoryId = null;
       _error = null;
     });
     await _reloadChoices();
@@ -234,32 +307,29 @@ class _AccessibilityBillingConfirmationSheetState
     int? savedTransactionId;
     try {
       final repo = ref.read(repositoryProvider);
-      final category = _findById(_categories, _draft.categoryId);
+      final category = _findById(
+        [..._topLevelCategories, ..._categories],
+        _draft.categoryId,
+      );
       final account = _findById(_accounts, _draft.accountId);
       final toAccount = _findById(_accounts, _draft.toAccountId);
       final selectedTags = _tags
           .where((tag) => _draft.tagIds.contains(tag.id))
           .map((tag) => tag.name)
           .toList();
-      final transactionId = await BillCreationService(repo).createFromBill(
-        bill: BillInfo(
-          amount: amount,
-          time: savedAt,
-          note: _draft.effectiveNote,
-          category: category?.name,
-          type: _billType(_draft.type),
-          account: account?.name,
-          fromAccount: account?.name,
-          toAccount: toAccount?.name,
-          ledgerId: ledgerId,
-          confidence: _draft.confidence,
-        ),
+      final transactionId = await repo.addTransaction(
         ledgerId: ledgerId,
-        autoAddTags: false,
+        type: _draft.type.name,
+        amount: amount,
+        categoryId: _persistedId(category),
+        accountId: _persistedId(account),
+        toAccountId: _persistedId(toAccount),
+        categorySyncIdOverride: _syncIdOverride(category),
+        accountSyncIdOverride: _syncIdOverride(account),
+        toAccountSyncIdOverride: _syncIdOverride(toAccount),
+        happenedAt: savedAt,
+        note: _draft.effectiveNote,
       );
-      if (transactionId == null) {
-        throw StateError('账单保存失败');
-      }
       savedTransactionId = transactionId;
       if (_draft.tagIds.isNotEmpty) {
         await repo.updateTransactionTags(
@@ -331,6 +401,7 @@ class _AccessibilityBillingConfirmationSheetState
         accountId: null,
         toAccountId: null,
       );
+      _expandedCategoryId = null;
     });
     await _reloadChoices();
   }
@@ -475,10 +546,13 @@ class _AccessibilityBillingConfirmationSheetState
       0.0,
       size.height - bottomInset - safePadding,
     );
-    final desiredPanelHeight = math.max(424.0, size.height * 0.46);
+    final desiredPanelHeight = math.max(440.0, size.height * 0.52);
     final panelHeight = math.min(
-      484.0,
-      math.min(desiredPanelHeight, availableHeight),
+      540.0,
+      math.min(
+        desiredPanelHeight,
+        math.min(availableHeight, size.height * 0.55),
+      ),
     );
     final amountColor = switch (_draft.type) {
       BillingDraftType.income => Colors.green.shade700,
@@ -532,22 +606,6 @@ class _AccessibilityBillingConfirmationSheetState
                         onChanged: _changeType,
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    SizedBox.square(
-                      dimension: 36,
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        tooltip: '反馈识别问题',
-                        onPressed: _saving
-                            ? null
-                            : () => ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('可在无障碍记账设置中采集诊断快照'),
-                                  ),
-                                ),
-                        icon: const Icon(Icons.feedback_outlined, size: 21),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -566,69 +624,38 @@ class _AccessibilityBillingConfirmationSheetState
                         )
                       else if (_draft.type != BillingDraftType.transfer)
                         Expanded(
-                          child: GridView.builder(
-                            padding: EdgeInsets.zero,
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 5,
-                              mainAxisSpacing: 4,
-                              crossAxisSpacing: 4,
-                              mainAxisExtent: 62,
-                            ),
-                            itemCount: _categories.length,
-                            itemBuilder: (context, index) {
-                              final category = _categories[index];
-                              final selected = _draft.categoryId == category.id;
-                              return InkWell(
-                                borderRadius: BorderRadius.circular(8),
-                                onTap: _saving
-                                    ? null
-                                    : () => setState(() {
-                                          _draft = _draft.copyWith(
-                                            categoryId: category.id,
-                                          );
-                                        }),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Container(
-                                      width: 36,
-                                      height: 36,
-                                      decoration: BoxDecoration(
-                                        color: selected
-                                            ? theme.colorScheme.primary
-                                                .withValues(alpha: 0.12)
-                                            : Colors.transparent,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: CategoryIconWidget(
-                                        category: category,
-                                        size: 21,
-                                        color: selected
-                                            ? theme.colorScheme.primary
-                                            : BeeTokens.iconCategory(context),
-                                        circular: true,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      category.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        height: 1,
-                                        color: selected
-                                            ? theme.colorScheme.primary
-                                            : BeeTokens.textPrimary(context),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
+                          child: _AccessibilityCategorySelector(
+                            topLevelCategories: _topLevelCategories,
+                            subCategories: _subCategories,
+                            selectedId: _draft.categoryId,
+                            expandedId: _expandedCategoryId,
+                            enabled: !_saving,
+                            onTopLevelTap: (category) {
+                              final hasChildren =
+                                  _subCategories[category.id]?.isNotEmpty ==
+                                      true;
+                              setState(() {
+                                if (hasChildren) {
+                                  _expandedCategoryId =
+                                      _expandedCategoryId == category.id
+                                          ? null
+                                          : category.id;
+                                  _draft = _draft.copyWith(
+                                    categoryId: category.id,
+                                  );
+                                } else {
+                                  _expandedCategoryId = null;
+                                  _draft = _draft.copyWith(
+                                    categoryId: category.id,
+                                  );
+                                }
+                              });
                             },
+                            onSubCategoryTap: (category) => setState(() {
+                              _draft = _draft.copyWith(
+                                categoryId: category.id,
+                              );
+                            }),
                           ),
                         )
                       else
@@ -722,7 +749,7 @@ class _AccessibilityBillingConfirmationSheetState
                       ),
                       const SizedBox(height: 4),
                       SizedBox(
-                        height: 46,
+                        height: 52,
                         child: Row(
                           children: [
                             if (_draft.type != BillingDraftType.transfer) ...[
@@ -764,7 +791,7 @@ class _AccessibilityBillingConfirmationSheetState
                             ],
                             const SizedBox(width: 4),
                             SizedBox(
-                              width: 36,
+                              width: 44,
                               child: _CompactOption(
                                 icon: Icons.flag_outlined,
                                 tooltip: '更多选项',
@@ -840,11 +867,28 @@ class _AccessibilityBillingConfirmationSheetState
     return null;
   }
 
-  static BillType _billType(BillingDraftType type) => switch (type) {
-        BillingDraftType.expense => BillType.expense,
-        BillingDraftType.income => BillType.income,
-        BillingDraftType.transfer => BillType.transfer,
-      };
+  static int? _persistedId(Object? value) {
+    final id = switch (value) {
+      Category category => category.id,
+      Account account => account.id,
+      _ => null,
+    };
+    return id != null && id >= 0 ? id : null;
+  }
+
+  static String? _syncIdOverride(Object? value) {
+    final id = switch (value) {
+      Category category => category.id,
+      Account account => account.id,
+      _ => null,
+    };
+    if (id == null || id >= 0) return null;
+    return switch (value) {
+      Category category => category.syncId,
+      Account account => account.syncId,
+      _ => null,
+    };
+  }
 
   static int? _validAccountId(int? accountId, List<Account> accounts) {
     if (accountId == null) return null;
@@ -922,6 +966,226 @@ class _BillingTypeSwitcher extends StatelessWidget {
   }
 }
 
+class _AccessibilityCategorySelector extends StatelessWidget {
+  const _AccessibilityCategorySelector({
+    required this.topLevelCategories,
+    required this.subCategories,
+    required this.selectedId,
+    required this.expandedId,
+    required this.enabled,
+    required this.onTopLevelTap,
+    required this.onSubCategoryTap,
+  });
+
+  final List<Category> topLevelCategories;
+  final Map<int, List<Category>> subCategories;
+  final int? selectedId;
+  final int? expandedId;
+  final bool enabled;
+  final ValueChanged<Category> onTopLevelTap;
+  final ValueChanged<Category> onSubCategoryTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (topLevelCategories.isEmpty) {
+      return Center(
+        child: Text(
+          '暂无可用分类',
+          style: TextStyle(color: BeeTokens.textSecondary(context)),
+        ),
+      );
+    }
+
+    final rows = <Widget>[];
+    for (var index = 0; index < topLevelCategories.length; index += 5) {
+      final end = math.min(index + 5, topLevelCategories.length);
+      final row = topLevelCategories.sublist(index, end);
+      rows.add(
+        SizedBox(
+          height: 62,
+          child: Row(
+            children: [
+              for (var itemIndex = 0; itemIndex < 5; itemIndex++)
+                Expanded(
+                  child: itemIndex < row.length
+                      ? _AccessibilityCategoryItem(
+                          category: row[itemIndex],
+                          selected: selectedId == row[itemIndex].id,
+                          hasChildren:
+                              subCategories[row[itemIndex].id]?.isNotEmpty ==
+                                  true,
+                          expanded: expandedId == row[itemIndex].id,
+                          enabled: enabled,
+                          onTap: () => onTopLevelTap(row[itemIndex]),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+            ],
+          ),
+        ),
+      );
+
+      Category? expandedParent;
+      for (final category in row) {
+        if (category.id == expandedId) {
+          expandedParent = category;
+          break;
+        }
+      }
+      final expandedChildren = expandedParent == null
+          ? const <Category>[]
+          : subCategories[expandedParent.id] ?? const <Category>[];
+      if (expandedChildren.isNotEmpty) {
+        rows.add(
+          _AccessibilitySubcategoryPanel(
+            subCategories: expandedChildren,
+            selectedId: selectedId,
+            enabled: enabled,
+            onTap: onSubCategoryTap,
+          ),
+        );
+      }
+    }
+
+    return ListView(
+      key: const ValueKey('accessibility-category-list'),
+      padding: EdgeInsets.zero,
+      children: rows,
+    );
+  }
+}
+
+class _AccessibilitySubcategoryPanel extends StatelessWidget {
+  const _AccessibilitySubcategoryPanel({
+    required this.subCategories,
+    required this.selectedId,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final List<Category> subCategories;
+  final int? selectedId;
+  final bool enabled;
+  final ValueChanged<Category> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final rowCount = (subCategories.length / 4).ceil();
+    return Container(
+      margin: const EdgeInsets.fromLTRB(4, 2, 4, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: SizedBox(
+        height: rowCount * 60.0,
+        child: GridView.builder(
+          padding: EdgeInsets.zero,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 4,
+            mainAxisSpacing: 0,
+            crossAxisSpacing: 2,
+            mainAxisExtent: 60,
+          ),
+          itemCount: subCategories.length,
+          itemBuilder: (context, index) {
+            final category = subCategories[index];
+            return _AccessibilityCategoryItem(
+              category: category,
+              selected: selectedId == category.id,
+              enabled: enabled,
+              onTap: () => onTap(category),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _AccessibilityCategoryItem extends StatelessWidget {
+  const _AccessibilityCategoryItem({
+    required this.category,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+    this.hasChildren = false,
+    this.expanded = false,
+  });
+
+  final Category category;
+  final bool selected;
+  final bool enabled;
+  final bool hasChildren;
+  final bool expanded;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final emphasized = selected || expanded;
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: enabled ? onTap : null,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: emphasized
+                      ? primary.withValues(alpha: 0.12)
+                      : Colors.transparent,
+                  shape: BoxShape.circle,
+                ),
+                child: CategoryIconWidget(
+                  category: category,
+                  size: 21,
+                  color: emphasized ? primary : BeeTokens.iconCategory(context),
+                  circular: true,
+                ),
+              ),
+              if (hasChildren)
+                Positioned(
+                  right: -2,
+                  bottom: -2,
+                  child: Icon(
+                    Icons.more_horiz,
+                    size: 14,
+                    color:
+                        expanded ? primary : BeeTokens.textSecondary(context),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: Text(
+              category.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1,
+                color: emphasized ? primary : BeeTokens.textPrimary(context),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CompactOption extends StatelessWidget {
   const _CompactOption({
     this.icon,
@@ -944,12 +1208,12 @@ class _CompactOption extends StatelessWidget {
     final content = Material(
       color:
           selected ? primary.withValues(alpha: 0.1) : const Color(0xFFF5F5F6),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(10),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -961,7 +1225,11 @@ class _CompactOption extends StatelessWidget {
                     label!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 14, color: foreground),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                      color: foreground,
+                    ),
                   ),
                 ),
             ],

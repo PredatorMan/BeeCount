@@ -158,7 +158,7 @@ internal class RecognitionRuleRepository(context: Context) {
 
 internal object RecognitionRuleUpdatePolicy {
     fun validate(candidate: RecognitionRuleSet, active: RecognitionRuleSet) {
-        require(candidate.schemaVersion == RecognitionRuleCodec.SUPPORTED_SCHEMA_VERSION) {
+        require(candidate.schemaVersion in 1..RecognitionRuleCodec.SUPPORTED_SCHEMA_VERSION) {
             "Unsupported schemaVersion"
         }
         require(candidate.rulesVersion >= BuiltInRecognitionRules.value.rulesVersion) {
@@ -167,6 +167,7 @@ internal object RecognitionRuleUpdatePolicy {
         require(candidate.rulesVersion > active.rulesVersion) {
             "rulesVersion must be newer than the active version"
         }
+        requireBuiltInAppsRetained(candidate, BuiltInRecognitionRules.value)
         requireNewAppsDisabled(candidate, BuiltInRecognitionRules.value)
     }
 
@@ -174,13 +175,34 @@ internal object RecognitionRuleUpdatePolicy {
         candidate: RecognitionRuleSet,
         builtIn: RecognitionRuleSet = BuiltInRecognitionRules.value,
     ) {
-        require(candidate.schemaVersion == RecognitionRuleCodec.SUPPORTED_SCHEMA_VERSION) {
+        require(candidate.schemaVersion in 1..RecognitionRuleCodec.SUPPORTED_SCHEMA_VERSION) {
             "Unsupported schemaVersion"
         }
-        require(candidate.rulesVersion >= builtIn.rulesVersion) {
-            "Cached rulesVersion is older than the built-in version"
+        require(candidate.rulesVersion > builtIn.rulesVersion) {
+            "Cached rulesVersion is not newer than the built-in version"
         }
+        requireBuiltInAppsRetained(candidate, builtIn)
         requireNewAppsDisabled(candidate, builtIn)
+    }
+
+    private fun requireBuiltInAppsRetained(
+        candidate: RecognitionRuleSet,
+        builtIn: RecognitionRuleSet,
+    ) {
+        val candidateApps = candidate.apps.associateBy { it.packageName }
+        val missingPackages = builtIn.apps
+            .filter { it.packageName !in candidateApps }
+            .map { it.packageName }
+        require(missingPackages.isEmpty()) {
+            "Built-in apps cannot be removed: ${missingPackages.joinToString()}"
+        }
+
+        val disabledPackages = builtIn.apps
+            .filter { candidateApps.getValue(it.packageName).defaultEnabled.not() }
+            .map { it.packageName }
+        require(disabledPackages.isEmpty()) {
+            "Built-in apps cannot default to disabled: ${disabledPackages.joinToString()}"
+        }
     }
 
     private fun requireNewAppsDisabled(

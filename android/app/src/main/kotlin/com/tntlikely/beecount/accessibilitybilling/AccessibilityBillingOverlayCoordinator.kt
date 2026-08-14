@@ -22,6 +22,15 @@ internal object AccessibilityBillingOverlayCoordinator {
         listeners.forEach(Listener::onDismissRequested)
     }
 
+    fun requestSuppressCurrentPage() {
+        listeners.forEach(Listener::onSuppressCurrentPageRequested)
+    }
+
+    /** Clears the current page session and asks the service to re-evaluate its global loop. */
+    fun requestRecognitionReset() {
+        listeners.forEach(Listener::onRecognitionResetRequested)
+    }
+
     fun addListener(listener: Listener) {
         listeners += listener
     }
@@ -33,5 +42,7 @@ internal object AccessibilityBillingOverlayCoordinator {
     internal interface Listener {
         fun onOverlayVisible()
         fun onDismissRequested()
+        fun onSuppressCurrentPageRequested()
+        fun onRecognitionResetRequested()
     }
 }

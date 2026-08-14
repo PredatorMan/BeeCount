@@ -655,6 +655,16 @@ class _HomePageState extends ConsumerState<HomePage> {
       }
     });
 
+    ref.listen<int>(homeTransactionRefreshProvider, (previous, next) {
+      if (previous == next || !mounted) return;
+      _transactionListKey.currentState?.forceStreamModeImmediate();
+      setState(() {
+        _txStream = null;
+        _txStreamLedgerId = null;
+        _streamBuilderKey++;
+      });
+    });
+
     // D 方案后:Drift JOIN + SharedLedger* table-watch 已经在 Repository 层
     // 自动响应共享资源变化(分类 / 账户),tx stream 会重 emit 出带新 name
     // 的记录。不再需要在 HomePage 强制 _streamBuilderKey++ / invalidate

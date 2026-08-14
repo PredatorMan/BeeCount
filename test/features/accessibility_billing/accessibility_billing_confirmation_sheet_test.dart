@@ -16,6 +16,7 @@ void main() {
   late LocalRepository repository;
   late int ledgerId;
   late int accountId;
+  late int diningCategoryId;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -29,6 +30,19 @@ void main() {
       ledgerId: ledgerId,
       name: '中国银行储蓄卡尾号5912超长资产',
     );
+    diningCategoryId = await repository.createCategory(
+      name: '餐饮',
+      kind: 'expense',
+      sortOrder: 0,
+    );
+    for (final (index, name) in ['早餐', '午餐', '晚餐', '外卖'].indexed) {
+      await repository.createSubCategory(
+        parentId: diningCategoryId,
+        name: name,
+        kind: 'expense',
+        sortOrder: index,
+      );
+    }
     for (var index = 1; index <= 20; index++) {
       await repository.createCategory(
         name: '分类${index.toString().padLeft(2, '0')}',
@@ -52,8 +66,10 @@ void main() {
       ledgerId: ledgerId,
     );
 
-    final grid = find.byType(GridView);
-    expect(grid, findsOneWidget);
+    final categoryList = find.byKey(
+      const ValueKey('accessibility-category-list'),
+    );
+    expect(categoryList, findsOneWidget);
     expect(find.byType(Divider), findsNothing);
     expect(find.textContaining('识别到支付方式'), findsNothing);
     expect(
@@ -78,23 +94,56 @@ void main() {
     expect(find.byIcon(Icons.schedule), findsNothing);
     final fields =
         tester.widgetList<TextField>(find.byType(TextField)).toList();
-    final primary =
-        Theme.of(tester.element(find.byType(GridView))).colorScheme.primary;
+    final primary = Theme.of(tester.element(categoryList)).colorScheme.primary;
     expect(fields.first.style?.color, primary);
     expect(fields[1].style?.color, Colors.red.shade600);
-    final gridRect = tester.getRect(grid);
-    for (var index = 1; index <= 15; index++) {
-      final label = find.text('分类${index.toString().padLeft(2, '0')}');
-      expect(label, findsOneWidget);
-      final labelRect = tester.getRect(label);
-      expect(labelRect.top, greaterThanOrEqualTo(gridRect.top));
-      expect(labelRect.bottom, lessThanOrEqualTo(gridRect.bottom + 0.5));
-    }
+    final listRect = tester.getRect(categoryList);
+    expect(find.text('餐饮'), findsOneWidget);
+    expect(tester.getRect(find.text('餐饮')).top,
+        greaterThanOrEqualTo(listRect.top));
 
     final fixedBefore = _fixedControlTops(tester);
-    await tester.drag(grid, const Offset(0, -120));
+    await tester.drag(categoryList, const Offset(0, -120));
     await tester.pump();
     expect(_fixedControlTops(tester), fixedBefore);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('点击一级分类后在当前行下方展开四列二级分类', (tester) async {
+    await _setTestViewport(tester, const Size(393, 852));
+    await _pumpConfirmationSheet(
+      tester,
+      repository: repository,
+      ledgerId: ledgerId,
+    );
+
+    expect(find.text('早餐'), findsNothing);
+    await tester.tap(find.text('餐饮'));
+    await tester.pumpAndSettle();
+
+    for (final name in ['早餐', '午餐', '晚餐', '外卖']) {
+      expect(find.text(name), findsOneWidget);
+    }
+    expect(find.byType(GridView), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('只点击有二级选项的一级分类时仍可按一级分类保存', (tester) async {
+    await _setTestViewport(tester, const Size(393, 852));
+    await _pumpConfirmationSheet(
+      tester,
+      repository: repository,
+      ledgerId: ledgerId,
+    );
+
+    await tester.tap(find.text('餐饮'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '保存'));
+    await tester.pumpAndSettle();
+
+    final transactions = await repository.getTransactionsByLedger(ledgerId);
+    expect(transactions, hasLength(1));
+    expect(transactions.single.categoryId, diningCategoryId);
     expect(tester.takeException(), isNull);
   });
 

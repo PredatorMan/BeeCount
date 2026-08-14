@@ -111,11 +111,24 @@ class _AccessibilityBillingOverlayHostState
 
     var completed = false;
     try {
-      await showAccessibilityBillingConfirmation(
+      final result = await showAccessibilityBillingConfirmation(
         context,
         draft: BillingDraft.fromAndroidMap(recognition),
       );
       completed = true;
+      if (result != null) {
+        try {
+          await _platformService.notifyTransactionSaved(
+            ledgerId: result.draft.ledgerId!,
+            transactionId: result.transactionId,
+          );
+        } catch (error) {
+          // The transaction is already committed. A refresh notification must
+          // never turn a successful save into a user-visible save failure.
+          debugPrint(
+              'Unable to notify the main app about the saved bill: $error');
+        }
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = error.toString());

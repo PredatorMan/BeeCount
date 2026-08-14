@@ -10,7 +10,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiConsentTitle => '开启 AI 功能前,请知悉';
 
   @override
-  String get aiConsentBody => 'AI 功能需将相关数据发送给你所配置的第三方 AI 服务商进行处理:\n\n• 发送给谁:默认「智谱 GLM」(open.bigmodel.cn,由智谱华章运营);若你自行配置了其它第三方 AI 服务商,则发送给你填写的服务商。\n• 发送什么:你主动用于识别/对话的内容 —— 账单图片、语音录音、你输入的文字,以及为完成识别/分析所需的分类名称、账户名称和相关交易记录。\n• 用途:仅用于账单识别、记账与你发起的对话分析;蜜蜂记账自身不收集、不存储这些数据。\n\n数据由该第三方服务商按其隐私政策处理。开启即表示你同意上述数据共享。';
+  String get aiConsentBody => 'AI 功能需将相关数据发送给你所配置的第三方 AI 服务商进行处理:\n\n• 发送给谁:默认「智谱 GLM」(open.bigmodel.cn,由智谱华章运营);若你自行配置了其它第三方 AI 服务商,则发送给你填写的服务商。\n• 发送什么:你主动用于识别/对话的内容 —— 账单图片、语音录音、你输入的文字,以及为完成识别/分析所需的分类名称、账户名称和相关交易记录。\n• 用途:仅用于账单识别、记账与你发起的对话分析;橙汁记账自身不收集、不存储这些数据。\n\n数据由该第三方服务商按其隐私政策处理。开启即表示你同意上述数据共享。';
 
   @override
   String get aiConsentAgree => '同意并开启';
@@ -22,7 +22,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutChangelog => '更新日志';
 
   @override
-  String get appTitle => '蜜蜂记账';
+  String get appTitle => '橙汁记账';
 
   @override
   String get tabHome => '明细';
@@ -132,7 +132,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceRecordingPermissionDeniedTitle => '需要麦克风权限';
 
   @override
-  String get voiceRecordingPermissionDeniedMessage => '语音记账功能需要使用麦克风权限。请在系统设置中允许蜜蜂记账访问麦克风。';
+  String get voiceRecordingPermissionDeniedMessage => '语音记账功能需要使用麦克风权限。请在系统设置中允许橙汁记账访问麦克风。';
 
   @override
   String voiceRecordingStartFailed(String error) {
@@ -277,7 +277,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeSelectDate => '选择日期';
 
   @override
-  String get homeAppTitle => '蜜蜂记账';
+  String get homeAppTitle => '橙汁记账';
 
   @override
   String get homeSearch => '搜索';
@@ -532,7 +532,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get analyticsToday => '今天';
 
   @override
-  String get splashAppName => '蜜蜂记账';
+  String get splashAppName => '橙汁记账';
 
   @override
   String get splashSlogan => '一笔一蜜';
@@ -971,7 +971,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get deleteConfirmMessage => '确定要删除这条记账吗？';
 
   @override
-  String get mineSlogan => '蜜蜂记账，一笔一蜜';
+  String get mineSlogan => '橙汁记账，每笔清晰';
 
   @override
   String get mineDisplayNameEditTitle => '设置昵称';
@@ -1199,7 +1199,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mineShareApp => '分享应用';
 
   @override
-  String get mineShareWithFriends => '和好友分享蜜蜂记账';
+  String get mineShareWithFriends => '和好友分享橙汁记账';
 
   @override
   String get mineCopyPromoText => '复制推广文案';
@@ -1211,7 +1211,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mineShareGenerating => '正在生成分享海报...';
 
   @override
-  String get sharePosterAppName => '蜜蜂记账';
+  String get sharePosterAppName => '橙汁记账';
 
   @override
   String get sharePosterSlogan => '一笔一蜜，记录美好生活';
@@ -1288,7 +1288,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sharePosterSaveSuccess => '已保存到相册';
 
   @override
-  String get shareGuidanceCopyText => '用蜜蜂记账记录生活，开源免费无广告！🐝 下载地址：https://github.com/TNT-Likely/BeeCount';
+  String get shareGuidanceCopyText => '用橙汁记账记录生活，开源免费无广告！🐝 下载地址：https://github.com/TNT-Likely/BeeCount';
 
   @override
   String get shareGuidanceCopied => '文案已复制';
@@ -2415,10 +2415,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reminderDescription => '提示：开启记账提醒后，系统会在每天指定时间发送通知提醒您记录收支。';
 
   @override
-  String get reminderIOSInstructions => '🍎 iOS通知设置：\n• 设置 > 通知 > 蜜蜂记账\n• 开启\"允许通知\"\n• 设置通知样式：横幅或提醒\n• 开启声音和震动\n\n⚠️ 重要提示：\n• iOS本地通知依赖应用进程\n• 请勿在任务管理器中划掉应用\n• 应用在后台或前台时通知正常\n• 完全关闭应用会导致通知失效\n\n💡 使用建议：\n• 日常使用后直接按Home键退出\n• iOS会自动管理后台应用\n• 保持应用在后台即可收到提醒';
+  String get reminderIOSInstructions => '🍎 iOS通知设置：\n• 设置 > 通知 > 橙汁记账\n• 开启\"允许通知\"\n• 设置通知样式：横幅或提醒\n• 开启声音和震动\n\n⚠️ 重要提示：\n• iOS本地通知依赖应用进程\n• 请勿在任务管理器中划掉应用\n• 应用在后台或前台时通知正常\n• 完全关闭应用会导致通知失效\n\n💡 使用建议：\n• 日常使用后直接按Home键退出\n• iOS会自动管理后台应用\n• 保持应用在后台即可收到提醒';
 
   @override
-  String get reminderAndroidInstructions => '如果通知无法正常工作，请检查：\n• 已允许应用发送通知\n• 关闭应用的电池优化/省电模式\n• 允许应用在后台运行和自启动\n• Android 12+需要精确闹钟权限\n\n📱 小米手机特殊设置：\n• 设置 > 应用管理 > 蜜蜂记账 > 通知管理\n• 点击\"记账提醒\"渠道\n• 设置重要性为\"紧急\"或\"高\"\n• 开启\"横幅通知\"、\"声音\"、\"震动\"\n• 安全中心 > 应用管理 > 权限 > 自启动\n\n🔒 锁定后台方法：\n• 最近任务中找到蜜蜂记账\n• 向下拉动应用卡片显示锁定图标\n• 点击锁定图标防止被清理';
+  String get reminderAndroidInstructions => '如果通知无法正常工作，请检查：\n• 已允许应用发送通知\n• 关闭应用的电池优化/省电模式\n• 允许应用在后台运行和自启动\n• Android 12+需要精确闹钟权限\n\n📱 小米手机特殊设置：\n• 设置 > 应用管理 > 橙汁记账 > 通知管理\n• 点击\"记账提醒\"渠道\n• 设置重要性为\"紧急\"或\"高\"\n• 开启\"横幅通知\"、\"声音\"、\"震动\"\n• 安全中心 > 应用管理 > 权限 > 自启动\n\n🔒 锁定后台方法：\n• 最近任务中找到橙汁记账\n• 向下拉动应用卡片显示锁定图标\n• 点击锁定图标防止被清理';
 
   @override
   String get categoryDetailLoadFailed => '加载失败';
@@ -3098,7 +3098,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateNotificationGuideStep1 => '进入系统设置 > 应用管理';
 
   @override
-  String get updateNotificationGuideStep2 => '找到\\\"蜜蜂记账\\\"应用';
+  String get updateNotificationGuideStep2 => '找到\\\"橙汁记账\\\"应用';
 
   @override
   String get updateNotificationGuideStep3 => '开启通知权限';
@@ -4008,7 +4008,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get iosWidgetStep2 => '点击左上角的\"+\"按钮';
 
   @override
-  String get iosWidgetStep3 => '搜索并选择\"蜜蜂记账\"';
+  String get iosWidgetStep3 => '搜索并选择\"橙汁记账\"';
 
   @override
   String get iosWidgetStep4 => '选择中型小组件，添加到主屏幕';
@@ -4020,7 +4020,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get androidWidgetStep2 => '选择\"小组件\"或\"Widgets\"';
 
   @override
-  String get androidWidgetStep3 => '找到并长按\"蜜蜂记账\"小组件';
+  String get androidWidgetStep3 => '找到并长按\"橙汁记账\"小组件';
 
   @override
   String get androidWidgetStep4 => '拖动到主屏幕合适位置';
@@ -4038,7 +4038,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get widgetQuickEntryDesc => '点击小组件左侧区域可快速新建支出，点击右侧区域可快速新建收入。也可通过快捷指令使用 beecount://new?type=transfer 快速发起转账。';
 
   @override
-  String get appName => '蜜蜂记账';
+  String get appName => '橙汁记账';
 
   @override
   String get monthSuffix => '月';
@@ -4122,10 +4122,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get iosAutoShortcutStep2 => '添加\"截屏\"操作';
 
   @override
-  String get iosAutoShortcutStep3 => '搜索并添加\"蜜蜂记账 - 截图自动记账\"操作';
+  String get iosAutoShortcutStep3 => '搜索并添加\"橙汁记账 - 截图自动记账\"操作';
 
   @override
-  String get iosAutoShortcutStep4 => '将\"蜜蜂记账\"的截图参数设置为上一步的\"截屏\"';
+  String get iosAutoShortcutStep4 => '将\"橙汁记账\"的截图参数设置为上一步的\"截屏\"';
 
   @override
   String get iosAutoShortcutStep5 => '（可选）在系统设置 > 辅助功能 > 触控 > 轻点背面中，绑定此快捷指令';
@@ -4530,10 +4530,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shareBillingDesc => '从支付宝/微信分享支付截图即可记账';
 
   @override
-  String get shareBillingGuide => '在支付宝、微信、相册等应用中看到支付截图时，点击「分享」并选择「蜜蜂记账」，即可自动识别金额、商家、时间等信息并记账，无需先保存截图。';
+  String get shareBillingGuide => '在支付宝、微信、相册等应用中看到支付截图时，点击「分享」并选择「橙汁记账」，即可自动识别金额、商家、时间等信息并记账，无需先保存截图。';
 
   @override
-  String get shareBillingActionHint => '分享后会在后台自动识别记账，无需手动打开蜜蜂记账';
+  String get shareBillingActionHint => '分享后会在后台自动识别记账，无需手动打开橙汁记账';
 
   @override
   String get automation => '自动化';
@@ -4605,7 +4605,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutDeveloperStoryTitle => '开发者的话';
 
   @override
-  String get aboutDeveloperStory => '从 2015 年实习起，我坚持记账至今已超过十年。因为担心记账软件的广告、付费、隐私泄露和停运跑路，我决定自己做一个——最初只是给自己和家人用的小工具。\n\n2025 年 9 月，蜜蜂记账发布了第一个版本。说实话，那时候心里没什么底，不知道会不会有人用。但慢慢地，开始收到用户的反馈——有人说终于找到了一款干净的记账软件，有人提了很好的建议，也有人默默给了五星好评。每一条反馈都让我觉得，这件事值得继续做下去。\n\n蜜蜂记账没有广告、没有会员、完全免费开源。你的每一笔数据都只存在你自己的手机里，不会被上传到任何第三方服务器。但上架和维护一款 App 并非零成本——开发者账号、服务器等开支目前靠社区捐赠勉强支撑，每一次适配新系统、修复 Bug、开发新功能，也都是工作之余一点点完成的。\n\n如果你觉得蜜蜂记账对你有帮助，一个好评、一次分享或一笔捐赠，都能让这个小项目走得更远。谢谢你的信任。';
+  String get aboutDeveloperStory => '从 2015 年实习起，我坚持记账至今已超过十年。因为担心记账软件的广告、付费、隐私泄露和停运跑路，我决定自己做一个——最初只是给自己和家人用的小工具。\n\n2025 年 9 月，橙汁记账发布了第一个版本。说实话，那时候心里没什么底，不知道会不会有人用。但慢慢地，开始收到用户的反馈——有人说终于找到了一款干净的记账软件，有人提了很好的建议，也有人默默给了五星好评。每一条反馈都让我觉得，这件事值得继续做下去。\n\n橙汁记账没有广告、没有会员、完全免费开源。你的每一笔数据都只存在你自己的手机里，不会被上传到任何第三方服务器。但上架和维护一款 App 并非零成本——开发者账号、服务器等开支目前靠社区捐赠勉强支撑，每一次适配新系统、修复 Bug、开发新功能，也都是工作之余一点点完成的。\n\n如果你觉得橙汁记账对你有帮助，一个好评、一次分享或一笔捐赠，都能让这个小项目走得更远。谢谢你的信任。';
 
   @override
   String get aboutRelatedProducts => '更多产品';
@@ -4617,7 +4617,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutBeeAssetsSubtitle => '可视化你的全部资产配置';
 
   @override
-  String get aboutBeeAssetsIntro => '蜜蜂记账侧重日常流水,蜜蜂家当是它的姐妹产品,专注资产配置可视化:跨账户净资产趋势、房产 / 投资 / 加密资产分类、收益率与持仓时长、配置占比一目了然。';
+  String get aboutBeeAssetsIntro => '橙汁记账侧重日常流水,蜜蜂家当是它的姐妹产品,专注资产配置可视化:跨账户净资产趋势、房产 / 投资 / 加密资产分类、收益率与持仓时长、配置占比一目了然。';
 
   @override
   String get aboutBeeDNS => '蜜蜂域名 BeeDNS';
@@ -5176,7 +5176,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get donationDescription => '说明';
 
   @override
-  String get donationDescriptionDetail => '感谢您使用蜜蜂记账！如果这个应用对您有帮助，欢迎请开发者喝杯咖啡作为鼓励。您的支持是我持续改进的动力。';
+  String get donationDescriptionDetail => '感谢您使用橙汁记账！如果这个应用对您有帮助，欢迎请开发者喝杯咖啡作为鼓励。您的支持是我持续改进的动力。';
 
   @override
   String get donationNoFeatures => '注: 打赏不会解锁任何功能，所有功能继续完全免费。';
@@ -5189,7 +5189,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String donationThankYouMessage(String productName) {
-    return '感谢您购买 $productName！您的支持对我意义重大，我会继续努力改进蜜蜂记账，让它变得更好用！';
+    return '感谢您购买 $productName！您的支持对我意义重大，我会继续努力改进橙汁记账，让它变得更好用！';
   }
 
   @override
@@ -6212,7 +6212,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appLockBiometricDesc => '使用Face ID或指纹快速解锁';
 
   @override
-  String get appLockBiometricReason => '请验证身份以解锁蜜蜂记账';
+  String get appLockBiometricReason => '请验证身份以解锁橙汁记账';
 
   @override
   String get appLockTimeout => '自动锁定时间';
@@ -7440,7 +7440,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get aiConsentTitle => '開啟 AI 功能前,請知悉';
 
   @override
-  String get aiConsentBody => 'AI 功能需將相關資料傳送給你所設定的第三方 AI 服務商進行處理:\n\n• 傳送給誰:預設「智譜 GLM」(open.bigmodel.cn,由智譜華章營運);若你自行設定了其它第三方 AI 服務商,則傳送給你填寫的服務商。\n• 傳送什麼:你主動用於辨識/對話的內容 —— 帳單圖片、語音錄音、你輸入的文字,以及為完成辨識/分析所需的分類名稱、帳戶名稱和相關交易記錄。\n• 用途:僅用於帳單辨識、記帳與你發起的對話分析;蜜蜂記帳本身不收集、不儲存這些資料。\n\n資料由該第三方服務商依其隱私政策處理。開啟即表示你同意上述資料共享。';
+  String get aiConsentBody => 'AI 功能需將相關資料傳送給你所設定的第三方 AI 服務商進行處理:\n\n• 傳送給誰:預設「智譜 GLM」(open.bigmodel.cn,由智譜華章營運);若你自行設定了其它第三方 AI 服務商,則傳送給你填寫的服務商。\n• 傳送什麼:你主動用於辨識/對話的內容 —— 帳單圖片、語音錄音、你輸入的文字,以及為完成辨識/分析所需的分類名稱、帳戶名稱和相關交易記錄。\n• 用途:僅用於帳單辨識、記帳與你發起的對話分析;橙汁記帳本身不收集、不儲存這些資料。\n\n資料由該第三方服務商依其隱私政策處理。開啟即表示你同意上述資料共享。';
 
   @override
   String get aiConsentAgree => '同意並開啟';
@@ -7452,7 +7452,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get aboutChangelog => '更新日誌';
 
   @override
-  String get appTitle => '蜜蜂記帳';
+  String get appTitle => '橙汁記帳';
 
   @override
   String get tabHome => '明細';
@@ -7562,7 +7562,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get voiceRecordingPermissionDeniedTitle => '需要麥克風權限';
 
   @override
-  String get voiceRecordingPermissionDeniedMessage => '語音記帳功能需要使用麥克風權限。請在系統設定中允許蜜蜂記帳存取麥克風。';
+  String get voiceRecordingPermissionDeniedMessage => '語音記帳功能需要使用麥克風權限。請在系統設定中允許橙汁記帳存取麥克風。';
 
   @override
   String voiceRecordingStartFailed(String error) {
@@ -7707,7 +7707,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get homeSelectDate => '選擇日期';
 
   @override
-  String get homeAppTitle => '蜜蜂記帳';
+  String get homeAppTitle => '橙汁記帳';
 
   @override
   String get homeSearch => '搜尋';
@@ -7962,7 +7962,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get analyticsToday => '今天';
 
   @override
-  String get splashAppName => '蜜蜂記帳';
+  String get splashAppName => '橙汁記帳';
 
   @override
   String get splashSlogan => '一筆一蜜';
@@ -8401,7 +8401,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get deleteConfirmMessage => '確定要刪除這條記帳嗎？';
 
   @override
-  String get mineSlogan => '蜜蜂記帳，一筆一蜜';
+  String get mineSlogan => '橙汁記帳，每筆清晰';
 
   @override
   String get mineDisplayNameEditTitle => '設定暱稱';
@@ -8629,7 +8629,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get mineShareApp => '分享應用程式';
 
   @override
-  String get mineShareWithFriends => '和好友分享蜜蜂記帳';
+  String get mineShareWithFriends => '和好友分享橙汁記帳';
 
   @override
   String get mineCopyPromoText => '複製推廣文案';
@@ -8641,7 +8641,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get mineShareGenerating => '正在生成分享海報...';
 
   @override
-  String get sharePosterAppName => '蜜蜂記帳';
+  String get sharePosterAppName => '橙汁記帳';
 
   @override
   String get sharePosterSlogan => '一筆一蜜，記錄美好生活';
@@ -8718,7 +8718,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get sharePosterSaveSuccess => '已儲存到相簿';
 
   @override
-  String get shareGuidanceCopyText => '用蜜蜂記帳記錄生活，開源免費無廣告！🐝 下載地址：https://github.com/TNT-Likely/BeeCount';
+  String get shareGuidanceCopyText => '用橙汁記帳記錄生活，開源免費無廣告！🐝 下載地址：https://github.com/TNT-Likely/BeeCount';
 
   @override
   String get shareGuidanceCopied => '文案已複製';
@@ -9845,10 +9845,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get reminderDescription => '提示：開啟記帳提醒後，系統會在每天指定時間發送通知提醒您記錄收支。';
 
   @override
-  String get reminderIOSInstructions => '🍎 iOS通知設定：\n• 設定 > 通知 > 蜜蜂記帳\n• 開啟\"允許通知\"\n• 設定通知樣式：橫幅或提醒\n• 開啟聲音和震動\n\n⚠️ 重要提示：\n• iOS本地通知依賴應用程序進程\n• 請勿在任務管理器中划掉應用\n• 應用在後台或前台時通知正常\n• 完全關閉應用會導致通知失效\n\n💡 使用建議：\n• 日常使用後直接按Home鍵退出\n• iOS會自動管理後台應用\n• 保持應用在後台即可收到提醒';
+  String get reminderIOSInstructions => '🍎 iOS通知設定：\n• 設定 > 通知 > 橙汁記帳\n• 開啟\"允許通知\"\n• 設定通知樣式：橫幅或提醒\n• 開啟聲音和震動\n\n⚠️ 重要提示：\n• iOS本地通知依賴應用程序進程\n• 請勿在任務管理器中划掉應用\n• 應用在後台或前台時通知正常\n• 完全關閉應用會導致通知失效\n\n💡 使用建議：\n• 日常使用後直接按Home鍵退出\n• iOS會自動管理後台應用\n• 保持應用在後台即可收到提醒';
 
   @override
-  String get reminderAndroidInstructions => '如果通知無法正常工作，請檢查：\n• 已允許應用程式發送通知\n• 關閉應用程式的電池最佳化/省電模式\n• 允許應用程式在背景執行和自啟動\n• Android 12+需要精確鬧鐘權限\n\n📱 小米手機特殊設定：\n• 設定 > 應用程式管理 > 蜜蜂記帳 > 通知管理\n• 點擊\"記帳提醒\"頻道\n• 設定重要性為\"緊急\"或\"高\"\n• 開啟\"橫幅通知\"、\"聲音\"、\"震動\"\n• 安全中心 > 應用程式管理 > 權限 > 自啟動\n\n🔒 鎖定背景方法：\n• 最近任務中找到蜜蜂記帳\n• 向下拉動應用程式卡片顯示鎖定圖示\n• 點擊鎖定圖示防止被清理';
+  String get reminderAndroidInstructions => '如果通知無法正常工作，請檢查：\n• 已允許應用程式發送通知\n• 關閉應用程式的電池最佳化/省電模式\n• 允許應用程式在背景執行和自啟動\n• Android 12+需要精確鬧鐘權限\n\n📱 小米手機特殊設定：\n• 設定 > 應用程式管理 > 橙汁記帳 > 通知管理\n• 點擊\"記帳提醒\"頻道\n• 設定重要性為\"緊急\"或\"高\"\n• 開啟\"橫幅通知\"、\"聲音\"、\"震動\"\n• 安全中心 > 應用程式管理 > 權限 > 自啟動\n\n🔒 鎖定背景方法：\n• 最近任務中找到橙汁記帳\n• 向下拉動應用程式卡片顯示鎖定圖示\n• 點擊鎖定圖示防止被清理';
 
   @override
   String get categoryDetailLoadFailed => '載入失敗';
@@ -10528,7 +10528,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get updateNotificationGuideStep1 => '進入系統設定 > 應用程式管理';
 
   @override
-  String get updateNotificationGuideStep2 => '找到\\\"蜜蜂記帳\\\"應用程式';
+  String get updateNotificationGuideStep2 => '找到\\\"橙汁記帳\\\"應用程式';
 
   @override
   String get updateNotificationGuideStep3 => '開啟通知權限';
@@ -11438,7 +11438,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get iosWidgetStep2 => '點擊左上角的\"+\"按鈕';
 
   @override
-  String get iosWidgetStep3 => '搜索並選擇\"蜜蜂記帳\"';
+  String get iosWidgetStep3 => '搜索並選擇\"橙汁記帳\"';
 
   @override
   String get iosWidgetStep4 => '選擇中型小組件，添加到主屏幕';
@@ -11450,7 +11450,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get androidWidgetStep2 => '選擇\"小組件\"或\"Widgets\"';
 
   @override
-  String get androidWidgetStep3 => '找到並長按\"蜜蜂記帳\"小組件';
+  String get androidWidgetStep3 => '找到並長按\"橙汁記帳\"小組件';
 
   @override
   String get androidWidgetStep4 => '拖動到主屏幕合适位置';
@@ -11468,7 +11468,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get widgetQuickEntryDesc => '點擊小組件左側區域可快速新建支出，點擊右側區域可快速新建收入。也可透過捷徑使用 beecount://new?type=transfer 快速發起轉帳。';
 
   @override
-  String get appName => '蜜蜂記帳';
+  String get appName => '橙汁記帳';
 
   @override
   String get monthSuffix => '月';
@@ -11552,10 +11552,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get iosAutoShortcutStep2 => '新增「截圖」操作';
 
   @override
-  String get iosAutoShortcutStep3 => '搜尋並新增「蜜蜂記帳 - 截圖自動記帳」操作';
+  String get iosAutoShortcutStep3 => '搜尋並新增「橙汁記帳 - 截圖自動記帳」操作';
 
   @override
-  String get iosAutoShortcutStep4 => '將「蜜蜂記帳」的截圖參數設定為上一步的「截圖」';
+  String get iosAutoShortcutStep4 => '將「橙汁記帳」的截圖參數設定為上一步的「截圖」';
 
   @override
   String get iosAutoShortcutStep5 => '（可選）在系統設定 > 輔助使用 > 觸控 > 輕點背面中，綁定此捷徑';
@@ -11960,10 +11960,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get shareBillingDesc => '從支付寶/微信分享支付截圖即可記帳';
 
   @override
-  String get shareBillingGuide => '在支付寶、微信、相簿等應用中看到支付截圖時，點擊「分享」並選擇「蜜蜂記帳」，即可自動識別金額、商家、時間等資訊並記帳，無需先儲存截圖。';
+  String get shareBillingGuide => '在支付寶、微信、相簿等應用中看到支付截圖時，點擊「分享」並選擇「橙汁記帳」，即可自動識別金額、商家、時間等資訊並記帳，無需先儲存截圖。';
 
   @override
-  String get shareBillingActionHint => '分享後會在背景自動識別記帳，無需手動開啟蜜蜂記帳';
+  String get shareBillingActionHint => '分享後會在背景自動識別記帳，無需手動開啟橙汁記帳';
 
   @override
   String get automation => '自動化';
@@ -12035,7 +12035,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get aboutDeveloperStoryTitle => '開發者的話';
 
   @override
-  String get aboutDeveloperStory => '從 2015 年實習起，我堅持記帳至今已超過十年。因為擔心記帳軟體的廣告、付費、隱私洩露和停運跑路，我決定自己做一個——最初只是給自己和家人用的小工具。\n\n2025 年 9 月，蜜蜂記帳發佈了第一個版本。說實話，那時候心裡沒什麼底，不知道會不會有人用。但慢慢地，開始收到用戶的回饋——有人說終於找到了一款乾淨的記帳軟體，有人提了很好的建議，也有人默默給了五星好評。每一條回饋都讓我覺得，這件事值得繼續做下去。\n\n蜜蜂記帳沒有廣告、沒有會員、完全免費開源。你的每一筆資料都只存在你自己的手機裡，不會被上傳到任何第三方伺服器。但上架和維護一款 App 並非零成本——開發者帳號、伺服器等開支目前靠社群捐贈勉強支撐，每一次適配新系統、修復 Bug、開發新功能，也都是工作之餘一點點完成的。\n\n如果你覺得蜜蜂記帳對你有幫助，一個好評、一次分享或一筆捐贈，都能讓這個小專案走得更遠。謝謝你的信任。';
+  String get aboutDeveloperStory => '從 2015 年實習起，我堅持記帳至今已超過十年。因為擔心記帳軟體的廣告、付費、隱私洩露和停運跑路，我決定自己做一個——最初只是給自己和家人用的小工具。\n\n2025 年 9 月，橙汁記帳發佈了第一個版本。說實話，那時候心裡沒什麼底，不知道會不會有人用。但慢慢地，開始收到用戶的回饋——有人說終於找到了一款乾淨的記帳軟體，有人提了很好的建議，也有人默默給了五星好評。每一條回饋都讓我覺得，這件事值得繼續做下去。\n\n橙汁記帳沒有廣告、沒有會員、完全免費開源。你的每一筆資料都只存在你自己的手機裡，不會被上傳到任何第三方伺服器。但上架和維護一款 App 並非零成本——開發者帳號、伺服器等開支目前靠社群捐贈勉強支撐，每一次適配新系統、修復 Bug、開發新功能，也都是工作之餘一點點完成的。\n\n如果你覺得橙汁記帳對你有幫助，一個好評、一次分享或一筆捐贈，都能讓這個小專案走得更遠。謝謝你的信任。';
 
   @override
   String get aboutRelatedProducts => '更多產品';
@@ -12047,7 +12047,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get aboutBeeAssetsSubtitle => '視覺化你的全部資產配置';
 
   @override
-  String get aboutBeeAssetsIntro => '蜜蜂記帳側重日常流水,蜜蜂家當是它的姐妹產品,專注資產配置視覺化:跨帳戶淨資產趨勢、房產 / 投資 / 加密資產分類、收益率與持倉時長、配置占比一目了然。';
+  String get aboutBeeAssetsIntro => '橙汁記帳側重日常流水,蜜蜂家當是它的姐妹產品,專注資產配置視覺化:跨帳戶淨資產趨勢、房產 / 投資 / 加密資產分類、收益率與持倉時長、配置占比一目了然。';
 
   @override
   String get aboutBeeDNS => '蜜蜂域名 BeeDNS';
@@ -12606,7 +12606,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get donationDescription => '說明';
 
   @override
-  String get donationDescriptionDetail => '感謝您使用蜜蜂記帳！如果這個應用對您有幫助，歡迎請開發者喝杯咖啡作為鼓勵。您的支持是我持續改進的動力。';
+  String get donationDescriptionDetail => '感謝您使用橙汁記帳！如果這個應用對您有幫助，歡迎請開發者喝杯咖啡作為鼓勵。您的支持是我持續改進的動力。';
 
   @override
   String get donationNoFeatures => '注：打賞不會解鎖任何功能，所有功能繼續完全免費。';
@@ -12619,7 +12619,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String donationThankYouMessage(String productName) {
-    return '感謝您購買 $productName！您的支持對我意義重大，我會繼續努力改進蜜蜂記帳，讓它變得更好用！';
+    return '感謝您購買 $productName！您的支持對我意義重大，我會繼續努力改進橙汁記帳，讓它變得更好用！';
   }
 
   @override
@@ -13642,7 +13642,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get appLockBiometricDesc => '使用Face ID或指紋快速解鎖';
 
   @override
-  String get appLockBiometricReason => '請驗證身份以解鎖蜜蜂記帳';
+  String get appLockBiometricReason => '請驗證身份以解鎖橙汁記帳';
 
   @override
   String get appLockTimeout => '自動鎖定時間';

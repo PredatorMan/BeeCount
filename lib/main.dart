@@ -25,6 +25,7 @@ import 'services/platform/screenshot_monitor_service.dart';
 import 'services/platform/image_share_handler_service.dart';
 import 'services/platform/app_link_service.dart';
 import 'features/accessibility_billing/presentation/accessibility_billing_overlay_app.dart';
+import 'features/accessibility_billing/accessibility_billing_refresh_coordinator.dart';
 import 'services/system/logger_service.dart';
 import 'l10n/app_localizations.dart';
 import 'widget/widget_manager.dart';
@@ -101,6 +102,10 @@ Future<void> main() async {
   // 初始化应用模式（需要在生成重复交易之前，确保模式正确）
   // 直接从 SharedPreferences 读取并设置到 appModeProvider
   await _initializeAppMode(container);
+
+  if (Platform.isAndroid) {
+    listenForAccessibilityBillingTransactionSaves(container);
+  }
 
   // 注意：不再在启动时生成重复交易
   // 周期交易生成已移至 appSplashInitProvider 中（等待数据库完全初始化后执行）

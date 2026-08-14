@@ -13,7 +13,6 @@ void main() {
 
   test('parses dynamic app and remote rule metadata', () {
     final settings = AccessibilityBillingPlatformSettings(
-      diagnosticsSupported: false,
       values: <Object?, Object?>{
         'adaptedApps': <Object?>[
           <Object?, Object?>{
@@ -43,7 +42,6 @@ void main() {
   test('falls back to legacy WeChat and Alipay settings', () async {
     final platform = _FakePlatformService(
       settings: const AccessibilityBillingPlatformSettings(
-        diagnosticsSupported: false,
         values: <Object?, Object?>{
           'wechatEnabled': false,
           'alipayEnabled': true,
@@ -74,7 +72,6 @@ void main() {
   test('manually updates rules and toggles a dynamic package', () async {
     final platform = _FakePlatformService(
       settings: const AccessibilityBillingPlatformSettings(
-        diagnosticsSupported: false,
         values: <Object?, Object?>{
           'adaptedApps': <Object?>[],
           'ruleVersion': 'built-in-1',
@@ -127,7 +124,6 @@ void main() {
       () async {
     final platform = _FakePlatformService(
       settings: const AccessibilityBillingPlatformSettings(
-        diagnosticsSupported: false,
         values: <Object?, Object?>{
           'adaptedApps': <Object?>[],
           'ruleUpdateSupported': true,
@@ -155,7 +151,6 @@ void main() {
   test('treats an unchanged rule update as a successful refresh', () async {
     final platform = _FakePlatformService(
       settings: const AccessibilityBillingPlatformSettings(
-        diagnosticsSupported: false,
         values: <Object?, Object?>{
           'adaptedApps': <Object?>[],
           'ruleUpdateSupported': true,

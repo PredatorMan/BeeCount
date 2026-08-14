@@ -27,7 +27,6 @@ class AccessibilityBillingState {
     this.notificationPermissionRequired = false,
     this.autoStartSettingsSupported = false,
     this.manufacturer = '',
-    this.diagnosticsSupported = false,
     this.adaptedApps = const <AccessibilityBillingAdaptedApp>[],
     this.usesDynamicAdaptedApps = false,
     this.ruleVersion = '',
@@ -49,7 +48,6 @@ class AccessibilityBillingState {
   final bool notificationPermissionRequired;
   final bool autoStartSettingsSupported;
   final String manufacturer;
-  final bool diagnosticsSupported;
   final List<AccessibilityBillingAdaptedApp> adaptedApps;
   final bool usesDynamicAdaptedApps;
   final String ruleVersion;
@@ -71,7 +69,6 @@ class AccessibilityBillingState {
     bool? notificationPermissionRequired,
     bool? autoStartSettingsSupported,
     String? manufacturer,
-    bool? diagnosticsSupported,
     List<AccessibilityBillingAdaptedApp>? adaptedApps,
     bool? usesDynamicAdaptedApps,
     String? ruleVersion,
@@ -100,7 +97,6 @@ class AccessibilityBillingState {
       autoStartSettingsSupported:
           autoStartSettingsSupported ?? this.autoStartSettingsSupported,
       manufacturer: manufacturer ?? this.manufacturer,
-      diagnosticsSupported: diagnosticsSupported ?? this.diagnosticsSupported,
       adaptedApps: adaptedApps ?? this.adaptedApps,
       usesDynamicAdaptedApps:
           usesDynamicAdaptedApps ?? this.usesDynamicAdaptedApps,
@@ -167,7 +163,6 @@ class AccessibilityBillingNotifier
             systemStatus['autostartSettingsSupported'] == true ||
                 systemStatus['autoStartSettingsSupported'] == true,
         manufacturer: systemStatus['manufacturer']?.toString() ?? '',
-        diagnosticsSupported: platformSettings?.diagnosticsSupported ?? false,
         adaptedApps: platformSettings?.hasDynamicAdaptedApps == true
             ? platformSettings!.adaptedApps
             : _fallbackAdaptedApps(settings),
@@ -346,8 +341,14 @@ class AccessibilityBillingNotifier
   Future<void> openOverlaySettings() =>
       _openSystemSettings(_platformService.openOverlaySettings);
 
-  Future<void> openBatteryOptimizationSettings() =>
-      _openSystemSettings(_platformService.openBatteryOptimizationSettings);
+  Future<void> openBatteryOptimizationSettings() async {
+    await _openSystemSettings(
+      state.batteryOptimizationIgnored
+          ? _platformService.openBatteryOptimizationSettings
+          : _platformService.requestIgnoreBatteryOptimizations,
+    );
+    await refreshServiceStatus();
+  }
 
   Future<void> openNotificationSettings() =>
       _openSystemSettings(_platformService.openNotificationSettings);
@@ -397,21 +398,6 @@ class AccessibilityBillingNotifier
             ? error.message ?? error.code
             : error.toString(),
       );
-    }
-  }
-
-  Future<bool> captureDiagnosticSnapshot() async {
-    try {
-      return await _platformService.captureDiagnosticSnapshot();
-    } catch (error) {
-      if (mounted) {
-        state = state.copyWith(
-          errorMessage: error is PlatformException
-              ? error.message ?? error.code
-              : error.toString(),
-        );
-      }
-      return false;
     }
   }
 

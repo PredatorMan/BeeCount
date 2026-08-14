@@ -39,21 +39,11 @@ git push origin main
 
 远程新增 App 必须默认关闭，用户需要在“已适配的 App”中主动开启。
 
-## 诊断快照
+## 界面快照
 
-调试包最多保存五份脱敏 JSON：
-
-```text
-/data/user/0/com.tntlikely.beecount.dev.debug/files/accessibility_billing/diagnostics/
-```
-
-适配流程：
-
-1. 停留在目标 App 的账单详情或支付结果页面。
-2. 通过最近任务切换到 BeeCount，不要先返回到聊天页或首页。
-3. 在无障碍记账设置中点击“采集界面诊断快照”。
-4. 根据 `packageName`、`activityName`、节点文本、父子关系和坐标编写规则。
-5. 使用脱敏测试数据补充 Android 单元测试。
-6. 递增远程 `rulesVersion`，发布后用真机手动更新并验证。
+BeeCount 不采集、缓存或落盘保存目标 App 的界面快照。新的适配流程使用
+GKD 采集快照 ZIP，再在独立的
+`BeeCount-Accessibility-Rules` 仓库中完成本地导入、脱敏、回放测试和规则发布。
+原始账单快照不得提交到 GitHub。
 
 真实姓名、完整卡号、订单号和未脱敏账单不得提交到 GitHub。

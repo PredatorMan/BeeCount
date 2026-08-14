@@ -2,14 +2,40 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
+class AccessibilityBillingSavedTransaction {
+  const AccessibilityBillingSavedTransaction({
+    required this.ledgerId,
+    required this.transactionId,
+  });
+
+  final int ledgerId;
+  final int transactionId;
+
+  static AccessibilityBillingSavedTransaction? fromMap(
+    Map<Object?, Object?> map,
+  ) {
+    final ledgerId = _positiveInt(map['ledgerId']);
+    final transactionId = _positiveInt(map['transactionId']);
+    if (ledgerId == null || transactionId == null) return null;
+    return AccessibilityBillingSavedTransaction(
+      ledgerId: ledgerId,
+      transactionId: transactionId,
+    );
+  }
+
+  static int? _positiveInt(Object? value) {
+    final parsed =
+        value is num ? value.toInt() : int.tryParse(value?.toString() ?? '');
+    return parsed != null && parsed > 0 ? parsed : null;
+  }
+}
+
 class AccessibilityBillingPlatformSettings {
   const AccessibilityBillingPlatformSettings({
     required this.values,
-    required this.diagnosticsSupported,
   });
 
   final Map<Object?, Object?> values;
-  final bool diagnosticsSupported;
 
   bool get hasDynamicAdaptedApps => values['adaptedApps'] is List;
 
@@ -153,6 +179,9 @@ class AccessibilityBillingPlatformService {
   static final StreamController<Map<Object?, Object?>>
       _detectedTransactionsController =
       StreamController<Map<Object?, Object?>>.broadcast();
+  static final StreamController<AccessibilityBillingSavedTransaction>
+      _savedTransactionsController =
+      StreamController<AccessibilityBillingSavedTransaction>.broadcast();
   static bool _handlerInstalled = false;
 
   Stream<Map<Object?, Object?>> get detectedTransactions {
@@ -160,16 +189,27 @@ class AccessibilityBillingPlatformService {
     return _detectedTransactionsController.stream;
   }
 
+  Stream<AccessibilityBillingSavedTransaction> get savedTransactions {
+    _installHandler();
+    return _savedTransactionsController.stream;
+  }
+
   void _installHandler() {
     if (_handlerInstalled) return;
     _handlerInstalled = true;
     _channel.setMethodCallHandler((call) async {
-      if (call.method != 'onTransactionDetected') return;
       final arguments = call.arguments;
-      if (arguments is Map) {
-        _detectedTransactionsController.add(
-          Map<Object?, Object?>.from(arguments),
-        );
+      if (arguments is! Map) return;
+      final values = Map<Object?, Object?>.from(arguments);
+      switch (call.method) {
+        case 'onTransactionDetected':
+          _detectedTransactionsController.add(values);
+        case 'onTransactionSaved':
+          final transaction =
+              AccessibilityBillingSavedTransaction.fromMap(values);
+          if (transaction != null) {
+            _savedTransactionsController.add(transaction);
+          }
       }
     });
   }
@@ -204,6 +244,9 @@ class AccessibilityBillingPlatformService {
   Future<void> openBatteryOptimizationSettings() =>
       _channel.invokeMethod<void>('openBatteryOptimizationSettings');
 
+  Future<void> requestIgnoreBatteryOptimizations() =>
+      _channel.invokeMethod<void>('requestIgnoreBatteryOptimizations');
+
   Future<void> openNotificationSettings() =>
       _channel.invokeMethod<void>('openNotificationSettings');
 
@@ -215,6 +258,19 @@ class AccessibilityBillingPlatformService {
 
   Future<void> dismissOverlay() =>
       _channel.invokeMethod<void>('dismissOverlay');
+
+  Future<void> notifyTransactionSaved({
+    required int ledgerId,
+    required int transactionId,
+  }) {
+    return _channel.invokeMethod<void>(
+      'notifyTransactionSaved',
+      <String, Object?>{
+        'ledgerId': ledgerId,
+        'transactionId': transactionId,
+      },
+    );
+  }
 
   Future<AccessibilityBillingRulesStatus> updateRecognitionRules() async {
     final result = await _channel.invokeMapMethod<Object?, Object?>(
@@ -246,7 +302,6 @@ class AccessibilityBillingPlatformService {
       if (result == null) return null;
       return AccessibilityBillingPlatformSettings(
         values: result,
-        diagnosticsSupported: result['diagnosticsSupported'] == true,
       );
     } on MissingPluginException {
       return null;
@@ -281,23 +336,6 @@ class AccessibilityBillingPlatformService {
           false;
     } on MissingPluginException {
       return false;
-    }
-  }
-
-  /// Returns false when the installed native host does not expose diagnostics.
-  Future<bool> captureDiagnosticSnapshot() async {
-    try {
-      final result = await _channel.invokeMethod<bool>(
-        'captureDiagnosticSnapshot',
-      );
-      return result ?? false;
-    } on MissingPluginException {
-      return false;
-    } on PlatformException catch (error) {
-      if (error.code == 'not_implemented' || error.code == 'unavailable') {
-        return false;
-      }
-      rethrow;
     }
   }
 

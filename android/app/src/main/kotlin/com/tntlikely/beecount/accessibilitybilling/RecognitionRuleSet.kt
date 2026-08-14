@@ -15,6 +15,7 @@ internal data class AppRecognitionRule(
     val displayName: String,
     val defaultEnabled: Boolean,
     val activityIncludes: List<String>,
+    val pageCandidateAnchors: List<String> = emptyList(),
     val pageRules: List<PageRecognitionRule>,
 )
 
@@ -30,6 +31,53 @@ internal data class PageRecognitionRule(
     val paymentMethod: FieldExtractionRule,
     val transactionTime: FieldExtractionRule,
     val orderId: FieldExtractionRule,
+    val pageMatch: PageNodeMatchRule = PageNodeMatchRule(),
+    val scope: ContainerScopeRule? = null,
+)
+
+internal data class PageNodeMatchRule(
+    val all: List<NodeSelector> = emptyList(),
+    val any: List<NodeSelector> = emptyList(),
+    val none: List<NodeSelector> = emptyList(),
+)
+
+internal data class NodeSelector(
+    val textEquals: List<String> = emptyList(),
+    val textContains: List<String> = emptyList(),
+    val textRegexes: List<String> = emptyList(),
+    val descriptionEquals: List<String> = emptyList(),
+    val descriptionContains: List<String> = emptyList(),
+    val descriptionRegexes: List<String> = emptyList(),
+    val viewIdEquals: List<String> = emptyList(),
+    val viewIdContains: List<String> = emptyList(),
+    val viewIdRegexes: List<String> = emptyList(),
+    val classNameEquals: List<String> = emptyList(),
+) {
+    fun isEmpty(): Boolean = listOf(
+        textEquals,
+        textContains,
+        textRegexes,
+        descriptionEquals,
+        descriptionContains,
+        descriptionRegexes,
+        viewIdEquals,
+        viewIdContains,
+        viewIdRegexes,
+        classNameEquals,
+    ).all { it.isEmpty() }
+}
+
+internal data class ContainerScopeRule(
+    val selector: NodeSelector? = null,
+    val anchor: NodeSelector? = null,
+    val ancestorLevels: Int = 0,
+)
+
+internal data class RelativeNodeRule(
+    val selector: NodeSelector,
+    val relativeTo: NodeSelector? = null,
+    val relation: String = "any",
+    val requireUnique: Boolean = true,
 )
 
 internal data class AmountExtractionRule(
@@ -39,6 +87,7 @@ internal data class AmountExtractionRule(
     val standaloneRegex: String? = null,
     val maxAnchorDistancePx: Int = 1800,
     val maxCurrencyDistancePx: Int = 300,
+    val node: RelativeNodeRule? = null,
 )
 
 internal data class FieldExtractionRule(
@@ -47,16 +96,17 @@ internal data class FieldExtractionRule(
     val beforeAmountNodes: Int = 0,
     val afterAmountNodes: Int = 0,
     val fallbackToMerchant: Boolean = false,
+    val node: RelativeNodeRule? = null,
 )
 
 internal object BuiltInRecognitionRules {
     private val unsafe = listOf(
         "支付失败", "付款失败", "交易失败",
         "支付处理中", "付款处理中", "交易处理中", "处理中",
-        "等待支付", "待支付", "未支付",
-        "支付已取消", "付款已取消", "已取消", "交易关闭",
+        "等待支付", "等待付款", "等待买家付款", "待支付", "待付款", "未支付", "未付款",
+        "支付已取消", "付款已取消", "已取消", "交易关闭", "已关闭",
         "退款成功", "退款中", "退款处理中", "已退款",
-        "输入支付密码", "支付密码", "验证支付密码", "确认付款", "立即付款",
+        "输入支付密码", "请输入支付密码", "支付密码", "验证支付密码", "确认付款", "立即付款",
     )
     private val amount = AmountExtractionRule(
         labels = listOf("金额", "支付金额", "付款金额", "交易金额"),
@@ -85,7 +135,7 @@ internal object BuiltInRecognitionRules {
 
     val value = RecognitionRuleSet(
         schemaVersion = RecognitionRuleCodec.SUPPORTED_SCHEMA_VERSION,
-        rulesVersion = 1,
+        rulesVersion = 6,
         apps = listOf(
             app(
                 id = "wechat",
@@ -99,7 +149,60 @@ internal object BuiltInRecognitionRules {
                 displayName = "支付宝",
                 successAnchors = listOf("支付成功", "付款成功", "交易成功"),
                 merchant = merchant.copy(beforeAmountNodes = 3),
+                leadingRules = alipayHistoricalRules(),
             ),
+        ),
+    )
+
+    private fun alipayHistoricalRules(): List<PageRecognitionRule> = listOf(
+        PageRecognitionRule(
+            id = "alipay_historical_bill_expense_v3",
+            transactionType = "expense",
+            requiredAnchors = listOf("账单详情"),
+            anyAnchors = listOf(
+                "支付时间", "付款时间", "交易时间",
+                "付款方式", "支付方式", "扣款方式",
+                "交易详情", "订单号", "交易号",
+            ),
+            excludedAnchors = unsafe,
+            amount = AmountExtractionRule(
+                regexes = listOf(
+                    "^支出\\s*[¥￥]?\\s*([0-9]{1,7}(?:\\.[0-9]{1,2})?)\\s*元$",
+                ),
+            ),
+            merchant = merchant.copy(beforeAmountNodes = 3),
+            note = note,
+            paymentMethod = paymentMethod,
+            transactionTime = transactionTime,
+            orderId = orderId,
+        ),
+        PageRecognitionRule(
+            id = "alipay_historical_bill_income_v3",
+            transactionType = "income",
+            requiredAnchors = listOf("账单详情"),
+            anyAnchors = listOf(
+                "收款时间", "入账时间", "到账时间", "交易时间",
+                "付款方", "付款人", "交易详情", "订单号", "交易号",
+            ),
+            excludedAnchors = unsafe,
+            amount = AmountExtractionRule(
+                regexes = listOf(
+                    "^收入\\s*[¥￥]?\\s*([0-9]{1,7}(?:\\.[0-9]{1,2})?)\\s*元$",
+                ),
+            ),
+            merchant = FieldExtractionRule(
+                labels = listOf("付款方", "付款人", "交易对象"),
+                beforeAmountNodes = 3,
+            ),
+            note = FieldExtractionRule(
+                labels = listOf("商品说明", "付款方备注", "备注"),
+                fallbackToMerchant = true,
+            ),
+            paymentMethod = FieldExtractionRule(),
+            transactionTime = FieldExtractionRule(
+                labels = listOf("收款时间", "入账时间", "到账时间", "交易时间"),
+            ),
+            orderId = orderId,
         ),
     )
 
@@ -109,13 +212,15 @@ internal object BuiltInRecognitionRules {
         displayName: String,
         successAnchors: List<String>,
         merchant: FieldExtractionRule = this.merchant,
+        leadingRules: List<PageRecognitionRule> = emptyList(),
     ): AppRecognitionRule = AppRecognitionRule(
         id = id,
         packageName = packageName,
         displayName = displayName,
         defaultEnabled = true,
         activityIncludes = emptyList(),
-        pageRules = listOf(
+        pageCandidateAnchors = listOf("账单详情", "交易详情", "支付时间", "付款方式"),
+        pageRules = leadingRules + listOf(
             PageRecognitionRule(
                 id = "${id}_income_success_v1",
                 transactionType = "income",
@@ -147,7 +252,7 @@ internal object BuiltInRecognitionRules {
 }
 
 internal object RecognitionRuleCodec {
-    const val SUPPORTED_SCHEMA_VERSION = 1
+    const val SUPPORTED_SCHEMA_VERSION = 2
     private const val MAX_APPS = 50
     private const val MAX_RULES_PER_APP = 20
     private const val MAX_LIST_ITEMS = 50
@@ -159,7 +264,7 @@ internal object RecognitionRuleCodec {
     fun parse(raw: String): RecognitionRuleSet {
         val root = StrictJsonParser.parse(raw).asObject("root")
         val schemaVersion = root.requirePositiveInt("schemaVersion")
-        require(schemaVersion == SUPPORTED_SCHEMA_VERSION) { "Unsupported schemaVersion: $schemaVersion" }
+        require(schemaVersion in 1..SUPPORTED_SCHEMA_VERSION) { "Unsupported schemaVersion: $schemaVersion" }
         val rulesVersion = root.requirePositiveInt("rulesVersion")
         val appArray = root.requireArray("apps")
         require(appArray.size in 1..MAX_APPS) { "apps must contain 1..$MAX_APPS items" }
@@ -185,6 +290,7 @@ internal object RecognitionRuleCodec {
             displayName = json.requireText("displayName"),
             defaultEnabled = json.optionalBoolean("defaultEnabled", true),
             activityIncludes = json.stringList("activityIncludes"),
+            pageCandidateAnchors = json.stringList("pageCandidateAnchors"),
             pageRules = pageRules,
         )
     }
@@ -196,7 +302,10 @@ internal object RecognitionRuleCodec {
         }
         val required = json.stringList("requiredAnchors")
         val any = json.stringList("anyAnchors")
-        require(required.isNotEmpty() || any.isNotEmpty()) { "A page rule needs requiredAnchors or anyAnchors" }
+        val pageMatch = parsePageMatch(json.optionalObject("pageMatch"))
+        require(required.isNotEmpty() || any.isNotEmpty() || pageMatch.all.isNotEmpty() || pageMatch.any.isNotEmpty()) {
+            "A page rule needs anchors or pageMatch.all/pageMatch.any"
+        }
         return PageRecognitionRule(
             id = json.requireText("id"),
             transactionType = transactionType,
@@ -209,6 +318,31 @@ internal object RecognitionRuleCodec {
             paymentMethod = parseField(json.optionalObject("paymentMethod")),
             transactionTime = parseField(json.optionalObject("transactionTime")),
             orderId = parseField(json.optionalObject("orderId")),
+            pageMatch = pageMatch,
+            scope = parseScope(json.optionalObject("scope")),
+        )
+    }
+
+    private fun parsePageMatch(json: Map<String, Any?>?): PageNodeMatchRule {
+        if (json == null) return PageNodeMatchRule()
+        return PageNodeMatchRule(
+            all = json.selectorList("all"),
+            any = json.selectorList("any"),
+            none = json.selectorList("none"),
+        )
+    }
+
+    private fun parseScope(json: Map<String, Any?>?): ContainerScopeRule? {
+        if (json == null) return null
+        val selector = json.optionalObject("selector")?.let(::parseSelector)
+        val anchor = json.optionalObject("anchor")?.let(::parseSelector)
+        require(selector != null || anchor != null) { "scope needs selector or anchor" }
+        return ContainerScopeRule(
+            selector = selector,
+            anchor = anchor,
+            ancestorLevels = json.optionalInt("ancestorLevels", 0).also {
+                require(it in 0..20) { "Invalid scope.ancestorLevels" }
+            },
         )
     }
 
@@ -231,6 +365,7 @@ internal object RecognitionRuleCodec {
             maxCurrencyDistancePx = json.optionalInt("maxCurrencyDistancePx", 300).also {
                 require(it in 20..1000) { "Invalid maxCurrencyDistancePx" }
             },
+            node = parseRelativeNode(json.optionalObject("node")),
         )
     }
 
@@ -251,8 +386,50 @@ internal object RecognitionRuleCodec {
                 require(it in 0..10) { "Invalid afterAmountNodes" }
             },
             fallbackToMerchant = json.optionalBoolean("fallbackToMerchant", false),
+            node = parseRelativeNode(json.optionalObject("node")),
         )
     }
+
+    private fun parseRelativeNode(json: Map<String, Any?>?): RelativeNodeRule? {
+        if (json == null) return null
+        val relation = json.optionalString("relation")?.trim()?.ifEmpty { "any" } ?: "any"
+        require(relation in SUPPORTED_RELATIONS) { "Unsupported node relation: $relation" }
+        val relativeTo = json.optionalObject("relativeTo")?.let(::parseSelector)
+        require(relation == "any" || relativeTo != null) { "node.relativeTo is required for relation $relation" }
+        return RelativeNodeRule(
+            selector = parseSelector(json.requireObject("selector")),
+            relativeTo = relativeTo,
+            relation = relation,
+            requireUnique = json.optionalBoolean("requireUnique", true),
+        )
+    }
+
+    private fun parseSelector(json: Map<String, Any?>): NodeSelector = NodeSelector(
+        textEquals = json.stringList("textEquals"),
+        textContains = json.stringList("textContains"),
+        textRegexes = json.regexList("textRegexes"),
+        descriptionEquals = json.stringList("descriptionEquals"),
+        descriptionContains = json.stringList("descriptionContains"),
+        descriptionRegexes = json.regexList("descriptionRegexes"),
+        viewIdEquals = json.stringList("viewIdEquals"),
+        viewIdContains = json.stringList("viewIdContains"),
+        viewIdRegexes = json.regexList("viewIdRegexes"),
+        classNameEquals = json.stringList("classNameEquals"),
+    ).also { require(!it.isEmpty()) { "Node selector cannot be empty" } }
+
+    private fun Map<String, Any?>.selectorList(key: String): List<NodeSelector> {
+        val array = this[key]?.asArray(key) ?: emptyList()
+        require(array.size <= MAX_LIST_ITEMS) { "$key has too many items" }
+        return array.mapIndexed { index, value -> parseSelector(value.asObject("$key[$index]")) }
+    }
+
+    private fun Map<String, Any?>.regexList(key: String): List<String> =
+        stringList(key).also { regexes ->
+            require(regexes.size <= MAX_REGEXES_PER_FIELD) {
+                "$key cannot contain more than $MAX_REGEXES_PER_FIELD items"
+            }
+            regexes.forEach(::validateRegex)
+        }
 
     private fun validateRegex(pattern: String) {
         require(pattern.length <= MAX_REGEX_LENGTH) { "Regex is too long" }
@@ -272,6 +449,9 @@ internal object RecognitionRuleCodec {
     private val UNSAFE_REGEX_GROUP = java.util.regex.Pattern.compile("\\(\\?(?!:)")
     private val REGEX_BACK_REFERENCE = java.util.regex.Pattern.compile("(?<!\\\\)(?:\\\\\\\\)*\\\\[1-9]")
     private val UNBOUNDED_GROUP_QUANTIFIER = java.util.regex.Pattern.compile("\\)(?:\\*|\\+|\\{\\d+,\\})")
+    private val SUPPORTED_RELATIONS = setOf(
+        "any", "self", "child", "descendant", "sibling", "followingSibling", "following", "ancestor",
+    )
 
     private fun Map<String, Any?>.requirePositiveInt(key: String): Int = requireInt(key).also {
         require(it > 0) { "$key must be positive" }

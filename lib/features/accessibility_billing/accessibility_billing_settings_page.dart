@@ -160,7 +160,7 @@ class _AccessibilityBillingSettingsPageState
                           leading: Icons.restart_alt,
                           title: '自启动',
                           subtitle: state.autoStartSettingsSupported
-                              ? '请在系统中允许 BeeCount 自启动'
+                              ? '请在系统中允许橙汁记账自启动'
                               : '当前系统无法读取状态，请前往应用设置确认',
                           trailing: const Icon(Icons.chevron_right),
                           onTap: ref
@@ -173,7 +173,7 @@ class _AccessibilityBillingSettingsPageState
                           title: '忽略电池优化',
                           subtitle: state.batteryOptimizationIgnored
                               ? '已设为不受限制'
-                              : '建议设为不受限制，避免后台识别暂停',
+                              : '需要设为不受限制，否则切换 App 或息屏后可能停止识别',
                           trailing: _permissionTrailing(
                             state.batteryOptimizationIgnored,
                           ),
@@ -186,7 +186,7 @@ class _AccessibilityBillingSettingsPageState
                           leading: Icons.notifications_outlined,
                           title: '通知权限',
                           subtitle: state.notificationsEnabled
-                              ? '已允许 BeeCount 发送通知'
+                              ? '已允许橙汁记账发送通知'
                               : '可选，仅影响现有提醒；自动记账当前依赖悬浮窗',
                           trailing: _permissionTrailing(
                             state.notificationsEnabled,
@@ -266,18 +266,6 @@ class _AccessibilityBillingSettingsPageState
                           trailing: const Icon(Icons.chevron_right),
                           onTap: () => _showAdaptedApps(context),
                         ),
-                        BeeTokens.cardDivider(context),
-                        AppListTile(
-                          leading: Icons.bug_report_outlined,
-                          title: '采集界面诊断快照',
-                          subtitle: state.diagnosticsSupported
-                              ? '保存最近界面的脱敏节点信息，用于规则适配'
-                              : '将在规则采集工具接入后开放',
-                          enabled: state.diagnosticsSupported,
-                          onTap: state.diagnosticsSupported
-                              ? () => _captureSnapshot(context)
-                              : null,
-                        ),
                       ],
                     ),
                   ),
@@ -295,16 +283,6 @@ class _AccessibilityBillingSettingsPageState
           ),
         ],
       ),
-    );
-  }
-
-  Future<void> _captureSnapshot(BuildContext context) async {
-    final captured = await ref
-        .read(accessibilityBillingProvider.notifier)
-        .captureDiagnosticSnapshot();
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(captured ? '诊断快照已保存在本机' : '当前没有可采集的界面快照')),
     );
   }
 
@@ -451,7 +429,7 @@ class _ConfirmationNotice extends StatelessWidget {
           const SizedBox(width: 10),
           const Expanded(
             child: Text(
-              '检测到支付完成后，BeeCount 会弹出记账面板。金额、分类、账本和账户都可以在面板中确认或修改，确认前不会写入账单。',
+              '检测到支付完成后，橙汁记账会弹出记账面板。金额、分类、账本和账户都可以在面板中确认或修改，确认前不会写入账单。',
               style: TextStyle(fontSize: 13, height: 1.45),
             ),
           ),

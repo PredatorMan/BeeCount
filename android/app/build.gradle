@@ -32,7 +32,9 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.tntlikely.beecount"
+        // Keep the upstream namespace/Kotlin packages stable so upstream changes
+        // remain easy to merge, while installing this fork as a separate app.
+        applicationId = "com.predatorman.orangejuice"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 23  // Required by record_android for voice recording
@@ -48,11 +50,11 @@ android {
         dev {
             dimension "env"
             applicationIdSuffix ".dev"
-            resValue "string", "app_name", "蜜蜂记账测试版"
+            resValue "string", "app_name", "橙汁记账测试版"
         }
         prod {
             dimension "env"
-            resValue "string", "app_name", "蜜蜂记账"
+            resValue "string", "app_name", "橙汁记账"
         }
     }
 
@@ -140,7 +142,7 @@ android {
             // Debug 构建追加独立后缀，名称显示为测试版，便于与生产包共存
             applicationIdSuffix ".debug"
             versionNameSuffix "-debug"
-            resValue "string", "app_name", "蜜蜂记账测试版"
+            resValue "string", "app_name", "橙汁记账测试版"
         }
         release {
             // Use a stable release keystore so upgrades don't require uninstall

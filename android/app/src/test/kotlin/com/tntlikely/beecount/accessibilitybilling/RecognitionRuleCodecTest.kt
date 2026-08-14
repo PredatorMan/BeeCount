@@ -9,6 +9,33 @@ import org.junit.Test
 
 class RecognitionRuleCodecTest {
     @Test
+    fun `parses schema v2 selectors scope and relative extraction`() {
+        val rules = RecognitionRuleCodec.parse(containerRulesJson())
+        val rule = rules.findApp("com.example.shop")!!.pageRules.single()
+
+        assertEquals(2, rules.schemaVersion)
+        assertEquals("order_card", rule.scope?.selector?.viewIdContains?.single())
+        assertEquals("followingSibling", rule.amount.node?.relation)
+        assertTrue(rule.pageMatch.none.single().textContains.contains("交易关闭"))
+    }
+
+    @Test
+    fun `rejects empty selectors and relative relation without reference`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            RecognitionRuleCodec.parse(containerRulesJson().replace(
+                "\"viewIdContains\": [\"order_card\"]",
+                "\"viewIdContains\": []",
+            ))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            RecognitionRuleCodec.parse(containerRulesJson().replace(
+                "\"relativeTo\": {\"textEquals\": [\"实付款\"]},",
+                "",
+            ))
+        }
+    }
+
+    @Test
     fun `parses declarative rule and recognizes a dynamically adapted app`() {
         val rules = RecognitionRuleCodec.parse(validRulesJson(rulesVersion = 2))
         val app = rules.findApp("com.example.wallet")!!
@@ -33,6 +60,18 @@ class RecognitionRuleCodecTest {
         assertEquals("早餐", result?.note)
         assertEquals("银行卡(1234)", result?.paymentMethod)
         assertEquals("expense", result?.transactionType)
+    }
+
+    @Test
+    fun `parses app page candidate anchors for slow loading classification`() {
+        val raw = validRulesJson(rulesVersion = 2).replace(
+            "\"activityIncludes\": [\"PaymentDetail\"],",
+            "\"activityIncludes\": [\"PaymentDetail\"], " +
+                "\"pageCandidateAnchors\": [\"账单详情\", \"交易详情\"],",
+        )
+        val app = RecognitionRuleCodec.parse(raw).findApp("com.example.wallet")!!
+
+        assertEquals(listOf("账单详情", "交易详情"), app.pageCandidateAnchors)
     }
 
     @Test
@@ -84,6 +123,18 @@ class RecognitionRuleCodecTest {
     }
 
     @Test
+    fun `update policy accepts supported legacy schema`() {
+        val legacy = withBuiltInApps(
+            RecognitionRuleCodec.parse(
+                validRulesJson(schemaVersion = 1, rulesVersion = 7, defaultEnabled = false),
+            ),
+        )
+
+        RecognitionRuleUpdatePolicy.validate(legacy, BuiltInRecognitionRules.value)
+        RecognitionRuleUpdatePolicy.validateCached(legacy, BuiltInRecognitionRules.value)
+    }
+
+    @Test
     fun `rejects excessively nested JSON`() {
         val deeplyNested = "[".repeat(70) + "0" + "]".repeat(70)
 
@@ -103,12 +154,27 @@ class RecognitionRuleCodecTest {
     }
 
     @Test
-    fun `remote new apps require explicit user enablement`() {
-        val enabledNewApp = RecognitionRuleCodec.parse(
-            validRulesJson(rulesVersion = 2, defaultEnabled = true),
+    fun `cached rules equal to built in version are discarded`() {
+        val cached = RecognitionRuleCodec.parse(
+            validRulesJson(rulesVersion = BuiltInRecognitionRules.value.rulesVersion),
         )
-        val disabledNewApp = RecognitionRuleCodec.parse(
-            validRulesJson(rulesVersion = 2, defaultEnabled = false),
+
+        assertThrows(IllegalArgumentException::class.java) {
+            RecognitionRuleUpdatePolicy.validateCached(cached, BuiltInRecognitionRules.value)
+        }
+    }
+
+    @Test
+    fun `remote new apps require explicit user enablement`() {
+        val enabledNewApp = withBuiltInApps(
+            RecognitionRuleCodec.parse(
+                validRulesJson(rulesVersion = 7, defaultEnabled = true),
+            ),
+        )
+        val disabledNewApp = withBuiltInApps(
+            RecognitionRuleCodec.parse(
+                validRulesJson(rulesVersion = 7, defaultEnabled = false),
+            ),
         )
 
         assertThrows(IllegalArgumentException::class.java) {
@@ -134,12 +200,48 @@ class RecognitionRuleCodecTest {
     }
 
     @Test
+    fun `remote rules cannot remove or default disable built in apps`() {
+        val builtIn = BuiltInRecognitionRules.value
+        val nextVersion = builtIn.rulesVersion + 1
+        val missingAlipay = builtIn.copy(
+            rulesVersion = nextVersion,
+            apps = builtIn.apps.filterNot {
+                it.packageName == AccessibilityBillingPreferences.ALIPAY_PACKAGE
+            },
+        )
+        val disabledAlipay = builtIn.copy(
+            rulesVersion = nextVersion,
+            apps = builtIn.apps.map { app ->
+                if (app.packageName == AccessibilityBillingPreferences.ALIPAY_PACKAGE) {
+                    app.copy(defaultEnabled = false)
+                } else {
+                    app
+                }
+            },
+        )
+
+        listOf(missingAlipay, disabledAlipay).forEach { candidate ->
+            assertThrows(IllegalArgumentException::class.java) {
+                RecognitionRuleUpdatePolicy.validate(candidate, builtIn)
+            }
+            assertThrows(IllegalArgumentException::class.java) {
+                RecognitionRuleUpdatePolicy.validateCached(candidate, builtIn)
+            }
+        }
+    }
+
+    @Test
     fun `built in rules remain available offline`() {
         val builtIn = BuiltInRecognitionRules.value
 
         assertNotNull(builtIn.findApp(AccessibilityBillingPreferences.WECHAT_PACKAGE))
         assertNotNull(builtIn.findApp(AccessibilityBillingPreferences.ALIPAY_PACKAGE))
         assertEquals(2, builtIn.apps.size)
+        assertEquals(6, builtIn.rulesVersion)
+        assertEquals(
+            "alipay_historical_bill_expense_v3",
+            builtIn.findApp(AccessibilityBillingPreferences.ALIPAY_PACKAGE)?.pageRules?.first()?.id,
+        )
     }
 
     private fun validRulesJson(
@@ -184,6 +286,46 @@ class RecognitionRuleCodecTest {
               },
               "transactionTime": {"labels": ["交易时间"]},
               "orderId": {"labels": ["交易号"]}
+            }]
+          }]
+        }
+    """.trimIndent()
+
+    private fun withBuiltInApps(candidate: RecognitionRuleSet): RecognitionRuleSet = candidate.copy(
+        apps = BuiltInRecognitionRules.value.apps + candidate.apps,
+    )
+
+    private fun containerRulesJson(): String = """
+        {
+          "schemaVersion": 2,
+          "rulesVersion": 10,
+          "apps": [{
+            "id": "example_shop",
+            "packageName": "com.example.shop",
+            "displayName": "示例商城",
+            "defaultEnabled": false,
+            "activityIncludes": [],
+            "rules": [{
+              "id": "order_detail_v2",
+              "transactionType": "expense",
+              "requiredAnchors": [],
+              "anyAnchors": [],
+              "excludedAnchors": [],
+              "pageMatch": {
+                "all": [{"viewIdEquals": ["com.example.shop:id/order_detail"]}],
+                "none": [{"textContains": ["交易关闭"]}]
+              },
+              "scope": {"selector": {"viewIdContains": ["order_card"]}},
+              "amount": {
+                "regexes": ["¥([0-9]+(?:\\.[0-9]{1,2})?)"],
+                "node": {
+                  "selector": {"textRegexes": ["¥[0-9]+(?:\\.[0-9]{1,2})?"]},
+                  "relativeTo": {"textEquals": ["实付款"]},
+                  "relation": "followingSibling"
+                }
+              },
+              "merchant": {}, "note": {}, "paymentMethod": {},
+              "transactionTime": {}, "orderId": {}
             }]
           }]
         }

@@ -50,6 +50,69 @@ class PaymentRecognitionEngineTest {
     }
 
     @Test
+    fun `recognizes paid Alipay historical bill without success status text`() {
+        val result = engine.recognize(
+            snapshot(
+                AccessibilityBillingPreferences.ALIPAY_PACKAGE,
+                "账单详情",
+                "支出134.8元",
+                "等待确认收货",
+                "支付时间",
+                "2026-08-13 16:29:17",
+                "付款方式",
+                "中国银行储蓄卡(5912)",
+                "交易详情",
+            ),
+        )
+
+        assertNotNull(result)
+        assertEquals("134.8", result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("alipay_historical_bill_expense_v3", result?.ruleId)
+    }
+
+    @Test
+    fun `Alipay historical detail requires explicit direction and a reliable field`() {
+        assertNull(
+            engine.recognize(
+                snapshot(
+                    AccessibilityBillingPreferences.ALIPAY_PACKAGE,
+                    "账单详情",
+                    "134.8元",
+                    "支付时间",
+                ),
+            ),
+        )
+        assertNull(
+            engine.recognize(
+                snapshot(
+                    AccessibilityBillingPreferences.ALIPAY_PACKAGE,
+                    "账单详情",
+                    "支出134.8元",
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `Alipay historical bill rejects unpaid failed closed and refund states`() {
+        listOf("等待付款", "支付失败", "交易关闭", "退款中").forEach { unsafeState ->
+            assertNull(
+                "Expected historical page containing '$unsafeState' to be rejected",
+                engine.recognize(
+                    snapshot(
+                        AccessibilityBillingPreferences.ALIPAY_PACKAGE,
+                        "账单详情",
+                        "支出134.8元",
+                        "支付时间",
+                        unsafeState,
+                    ),
+                ),
+            )
+        }
+    }
+
+    @Test
     fun `does not recognize success words without amount`() {
         assertNull(
             engine.recognize(
@@ -216,6 +279,157 @@ class PaymentRecognitionEngineTest {
         assertNull(engine.recognize(snapshot("example.unsupported", "支付成功", "￥8.00")))
     }
 
+    @Test
+    fun `classifies partially loaded bill detail as candidate`() {
+        val rules = BuiltInRecognitionRules.value.copy(
+            apps = BuiltInRecognitionRules.value.apps.map { app ->
+                if (app.packageName == AccessibilityBillingPreferences.ALIPAY_PACKAGE) {
+                    app.copy(pageCandidateAnchors = listOf("账单详情", "交易详情"))
+                } else {
+                    app
+                }
+            },
+        )
+        val state = PaymentRecognitionEngine { rules }.classify(
+            snapshot(AccessibilityBillingPreferences.ALIPAY_PACKAGE, "账单详情", "加载中"),
+        )
+
+        assertEquals(PaymentRecognitionEngine.PageState.BILL_CANDIDATE, state)
+    }
+
+    @Test
+    fun `classifies readable unrelated page as non bill`() {
+        val state = engine.classify(
+            snapshot(AccessibilityBillingPreferences.ALIPAY_PACKAGE, "支付宝首页", "扫一扫"),
+        )
+
+        assertEquals(PaymentRecognitionEngine.PageState.NON_BILL_PAGE, state)
+    }
+
+    @Test
+    fun `classifies empty slow loading webview as bill candidate`() {
+        val state = engine.classify(
+            snapshot(AccessibilityBillingPreferences.ALIPAY_PACKAGE),
+        )
+
+        assertEquals(PaymentRecognitionEngine.PageState.BILL_CANDIDATE, state)
+    }
+
+    @Test
+    fun `classifies loading placeholder as bill candidate`() {
+        val state = engine.classify(
+            snapshot(AccessibilityBillingPreferences.ALIPAY_PACKAGE, "加载中"),
+        )
+
+        assertEquals(PaymentRecognitionEngine.PageState.BILL_CANDIDATE, state)
+    }
+
+    @Test
+    fun `loading label inside a readable unrelated page does not block departure`() {
+        val state = engine.classify(
+            snapshot(
+                AccessibilityBillingPreferences.ALIPAY_PACKAGE,
+                "支付宝首页",
+                "扫一扫",
+                "收付款",
+                "加载中",
+            ),
+        )
+
+        assertEquals(PaymentRecognitionEngine.PageState.NON_BILL_PAGE, state)
+    }
+
+    @Test
+    fun `v2 scopes extraction to a unique transaction container`() {
+        val scopedEngine = PaymentRecognitionEngine { scopedRuleSet() }
+        val result = scopedEngine.recognize(
+            treeSnapshot(
+                node(0, "订单详情", 0, parentIndex = null, viewId = "shop:id/detail_page"),
+                node(1, null, 100, parentIndex = 0, viewId = "shop:id/order_card"),
+                node(2, "交易完成", 200, parentIndex = 1),
+                node(3, "商品单价", 300, parentIndex = 1),
+                node(4, "¥6.02", 400, parentIndex = 1),
+                node(5, "实付款", 500, parentIndex = 1),
+                node(6, "¥17.96", 600, parentIndex = 1),
+                node(7, "示例商店", 700, parentIndex = 1, viewId = "shop:id/merchant"),
+                node(8, "¥4699", 800, parentIndex = 0),
+            ),
+        )
+
+        assertNotNull(result)
+        assertEquals("17.96", result?.amount)
+        assertEquals("示例商店", result?.merchant)
+    }
+
+    @Test
+    fun `v2 rejects more than one matching transaction container`() {
+        val scopedEngine = PaymentRecognitionEngine { scopedRuleSet() }
+        val result = scopedEngine.recognize(
+            treeSnapshot(
+                node(0, "全部订单", 0, parentIndex = null, viewId = "shop:id/detail_page"),
+                node(1, null, 100, parentIndex = 0, viewId = "shop:id/order_card"),
+                node(2, "交易完成", 200, parentIndex = 1),
+                node(3, "实付款", 300, parentIndex = 1),
+                node(4, "¥17.96", 400, parentIndex = 1),
+                node(5, null, 500, parentIndex = 0, viewId = "shop:id/order_card"),
+                node(6, "交易完成", 600, parentIndex = 5),
+                node(7, "实付款", 700, parentIndex = 5),
+                node(8, "¥224.05", 800, parentIndex = 5),
+            ),
+        )
+
+        assertNull(result)
+    }
+
+    @Test
+    fun `v2 rejects ambiguous relative amount candidates`() {
+        val scopedEngine = PaymentRecognitionEngine { scopedRuleSet() }
+        val result = scopedEngine.recognize(
+            treeSnapshot(
+                node(0, "订单详情", 0, parentIndex = null, viewId = "shop:id/detail_page"),
+                node(1, null, 100, parentIndex = 0, viewId = "shop:id/order_card"),
+                node(2, "交易完成", 200, parentIndex = 1),
+                node(3, "实付款", 300, parentIndex = 1),
+                node(4, "¥17.96", 400, parentIndex = 1),
+                node(5, "¥18.96", 500, parentIndex = 1),
+            ),
+        )
+
+        assertNull(result)
+    }
+
+    @Test
+    fun `v2 can derive its container from an anchor ancestor`() {
+        val base = scopedRuleSet()
+        val pageRule = base.apps.single().pageRules.single()
+        val anchorScoped = base.copy(
+            apps = listOf(
+                base.apps.single().copy(
+                    pageRules = listOf(
+                        pageRule.copy(
+                            scope = ContainerScopeRule(
+                                anchor = NodeSelector(textEquals = listOf("交易完成")),
+                                ancestorLevels = 1,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val result = PaymentRecognitionEngine { anchorScoped }.recognize(
+            treeSnapshot(
+                node(0, "订单详情", 0, parentIndex = null, viewId = "shop:id/detail_page"),
+                node(1, null, 100, parentIndex = 0, viewId = "shop:id/order_card"),
+                node(2, "交易完成", 200, parentIndex = 1),
+                node(3, "实付款", 300, parentIndex = 1),
+                node(4, "¥17.96", 400, parentIndex = 1),
+                node(5, "示例商店", 500, parentIndex = 1, viewId = "shop:id/merchant"),
+            ),
+        )
+
+        assertEquals("17.96", result?.amount)
+    }
+
     private fun snapshot(packageName: String, vararg texts: String): AccessibilityPageSnapshot {
         return AccessibilityPageSnapshot(
             packageName = packageName,
@@ -227,13 +441,70 @@ class PaymentRecognitionEngineTest {
         )
     }
 
-    private fun node(index: Int, text: String, top: Int): NormalizedNode = NormalizedNode(
+    private fun treeSnapshot(vararg nodes: NormalizedNode): AccessibilityPageSnapshot =
+        AccessibilityPageSnapshot("com.example.shop", "OrderActivity", "1.0", nodes.toList())
+
+    private fun scopedRuleSet(): RecognitionRuleSet = RecognitionRuleSet(
+        schemaVersion = 2,
+        rulesVersion = 2,
+        apps = listOf(
+            AppRecognitionRule(
+                id = "example_shop",
+                packageName = "com.example.shop",
+                displayName = "示例商城",
+                defaultEnabled = false,
+                activityIncludes = emptyList(),
+                pageRules = listOf(
+                    PageRecognitionRule(
+                        id = "order_detail_v2",
+                        transactionType = "expense",
+                        requiredAnchors = emptyList(),
+                        anyAnchors = emptyList(),
+                        excludedAnchors = emptyList(),
+                        amount = AmountExtractionRule(
+                            regexes = listOf("¥([0-9]+(?:\\.[0-9]{1,2})?)"),
+                            node = RelativeNodeRule(
+                                selector = NodeSelector(textRegexes = listOf("¥[0-9]+(?:\\.[0-9]{1,2})?")),
+                                relativeTo = NodeSelector(textEquals = listOf("实付款")),
+                                relation = "followingSibling",
+                            ),
+                        ),
+                        merchant = FieldExtractionRule(
+                            node = RelativeNodeRule(
+                                selector = NodeSelector(viewIdContains = listOf("merchant")),
+                            ),
+                        ),
+                        note = FieldExtractionRule(fallbackToMerchant = true),
+                        paymentMethod = FieldExtractionRule(),
+                        transactionTime = FieldExtractionRule(),
+                        orderId = FieldExtractionRule(),
+                        pageMatch = PageNodeMatchRule(
+                            all = listOf(NodeSelector(viewIdEquals = listOf("shop:id/detail_page"))),
+                            any = listOf(NodeSelector(textEquals = listOf("交易完成"))),
+                            none = listOf(NodeSelector(textContains = listOf("交易关闭"))),
+                        ),
+                        scope = ContainerScopeRule(
+                            selector = NodeSelector(viewIdEquals = listOf("shop:id/order_card")),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    private fun node(
+        index: Int,
+        text: String?,
+        top: Int,
+        parentIndex: Int? = null,
+        viewId: String = "example:id/node_$index",
+    ): NormalizedNode = NormalizedNode(
         index = index,
-        parentIndex = null,
+        parentIndex = parentIndex,
         depth = 0,
         text = text,
         contentDescription = null,
-        viewId = "example:id/node_$index",
+        viewId = viewId,
         className = "android.widget.TextView",
         bounds = NodeBounds(0, top, 500, top + 100),
     )

@@ -52,6 +52,11 @@ internal data class PaymentRecognition(
 internal class PaymentRecognitionEngine(
     private val ruleSetProvider: () -> RecognitionRuleSet = { BuiltInRecognitionRules.value },
 ) {
+    internal enum class PageState {
+        BILL_CANDIDATE,
+        NON_BILL_PAGE,
+    }
+
     private val regexCache = mutableMapOf<String, Regex>()
 
     fun recognize(snapshot: AccessibilityPageSnapshot): PaymentRecognition? {
@@ -64,13 +69,36 @@ internal class PaymentRecognitionEngine(
         return app.pageRules.firstNotNullOfOrNull { rule -> evaluate(snapshot, app, rule) }
     }
 
+    fun classify(snapshot: AccessibilityPageSnapshot): PageState {
+        val app = ruleSetProvider().findApp(snapshot.packageName) ?: return PageState.NON_BILL_PAGE
+        val texts = snapshot.nodes.map { it.searchableText }.filter { it.isNotBlank() }
+        if (texts.isEmpty() ||
+            (texts.size <= MAX_LOADING_PLACEHOLDER_NODES &&
+                texts.any { text -> LOADING_PAGE_TEXTS.any(text::contains) })
+        ) {
+            return PageState.BILL_CANDIDATE
+        }
+        val candidateAnchors = app.pageCandidateAnchors + app.pageRules.flatMap { rule ->
+            rule.requiredAnchors + rule.anyAnchors + rule.amount.labels +
+                rule.transactionTime.labels + rule.paymentMethod.labels
+        }
+        return if (candidateAnchors.any { anchor -> texts.any { it.contains(anchor) } }) {
+            PageState.BILL_CANDIDATE
+        } else {
+            PageState.NON_BILL_PAGE
+        }
+    }
+
     private fun evaluate(
         snapshot: AccessibilityPageSnapshot,
         app: AppRecognitionRule,
         rule: PageRecognitionRule,
     ): PaymentRecognition? {
-        val nodes = snapshot.nodes.filter { it.searchableText.isNotBlank() }
-        val texts = nodes.map { it.searchableText }
+        val pageNodes = snapshot.nodes
+        if (!matchesPage(pageNodes, rule.pageMatch)) return null
+        val scopeNodes = resolveScope(pageNodes, rule.scope) ?: return null
+        val textNodes = scopeNodes.filter { it.searchableText.isNotBlank() }
+        val texts = textNodes.map { it.searchableText }
         val excluded = SYSTEM_EXCLUDED_PHRASES + rule.excludedAnchors
         if (texts.any { text -> excluded.any(text::contains) }) return null
         if (rule.requiredAnchors.any { anchor -> texts.none { it.contains(anchor) } }) return null
@@ -78,10 +106,12 @@ internal class PaymentRecognitionEngine(
                 texts.any { it.contains(anchor) }
             }
         ) return null
-
         val anchors = rule.anyAnchors + rule.requiredAnchors
-        val anchorNode = nodes.firstOrNull { node -> anchors.any(node.searchableText::contains) } ?: return null
-        val amountCandidate = findAmount(nodes, anchorNode, rule.amount) ?: return null
+        val nodes = scopeNodes.filter { it.searchableText.isNotBlank() || it.viewId != null }
+        val anchorNode = nodes.firstOrNull { node -> anchors.any(node.searchableText::contains) }
+            ?: scopeNodes.firstOrNull()
+            ?: return null
+        val amountCandidate = findAmount(nodes, anchorNode, rule.amount, pageNodes) ?: return null
         val allLabels = listOf(
             rule.merchant,
             rule.note,
@@ -89,8 +119,8 @@ internal class PaymentRecognitionEngine(
             rule.transactionTime,
             rule.orderId,
         ).flatMap { it.labels } + rule.amount.labels
-        val merchant = extractField(nodes, amountCandidate, rule.merchant, allLabels, anchors, excluded)
-        val note = extractField(nodes, amountCandidate, rule.note, allLabels, anchors, excluded)
+        val merchant = extractField(nodes, amountCandidate, rule.merchant, allLabels, anchors, excluded, pageNodes)
+        val note = extractField(nodes, amountCandidate, rule.note, allLabels, anchors, excluded, pageNodes)
             ?: merchant.takeIf { rule.note.fallbackToMerchant }
         val paymentMethod = extractField(
             nodes,
@@ -99,6 +129,7 @@ internal class PaymentRecognitionEngine(
             allLabels,
             anchors,
             excluded,
+            pageNodes,
         )
         val transactionTime = extractField(
             nodes,
@@ -107,8 +138,17 @@ internal class PaymentRecognitionEngine(
             allLabels,
             anchors,
             excluded,
+            pageNodes,
         )
-        val rawOrderId = extractField(nodes, amountCandidate, rule.orderId, allLabels, anchors, excluded)
+        val rawOrderId = extractField(
+            nodes,
+            amountCandidate,
+            rule.orderId,
+            allLabels,
+            anchors,
+            excluded,
+            pageNodes,
+        )
         val orderFingerprint = rawOrderId?.let { sha256("${snapshot.packageName}|$it") }
 
         var confidence = 0.84
@@ -119,7 +159,6 @@ internal class PaymentRecognitionEngine(
 
         val pageFingerprint = sha256(buildString {
             append("package=").append(snapshot.packageName)
-            append("|activity=").append(snapshot.activityName.orEmpty())
             append("|type=").append(rule.transactionType)
             append("|amount=").append(amountCandidate.amount)
             append("|merchant=").append(merchant.orEmpty())
@@ -148,7 +187,18 @@ internal class PaymentRecognitionEngine(
         nodes: List<NormalizedNode>,
         anchor: NormalizedNode,
         spec: AmountExtractionRule,
+        pageNodes: List<NormalizedNode>,
     ): AmountCandidate? {
+        spec.node?.let { relative ->
+            val matches = resolveRelativeNodes(nodes, relative, pageNodes) ?: return null
+            val candidates = matches.flatMap { node ->
+                val position = nodes.indexOfFirst { it.index == node.index }
+                extractAmounts(node.searchableText, spec).map { amount ->
+                    AmountCandidate(amount, node, position, decorated = true)
+                }
+            }.distinctBy { it.amount to it.node.index }
+            return candidates.singleOrNull()
+        }
         val candidates = mutableListOf<AmountCandidate>()
         val compiled = spec.regexes.map(::compiledRegex)
         val standalone = spec.standaloneRegex?.let(::compiledRegex)
@@ -191,7 +241,13 @@ internal class PaymentRecognitionEngine(
         allLabels: List<String>,
         anchors: List<String>,
         excluded: List<String>,
+        pageNodes: List<NormalizedNode>,
     ): String? {
+        spec.node?.let { relative ->
+            val matches = resolveRelativeNodes(nodes, relative, pageNodes) ?: return null
+            val values = matches.mapNotNull { node -> extractNodeValue(node, spec) }.distinct()
+            return values.singleOrNull()?.take(MAX_FIELD_LENGTH)
+        }
         nodes.forEachIndexed { index, _ ->
             extractLabelValue(nodes, index, spec.labels, allLabels)?.let { return it.take(MAX_FIELD_LENGTH) }
         }
@@ -217,6 +273,132 @@ internal class PaymentRecognitionEngine(
             }
         }
         return null
+    }
+
+    private fun matchesPage(nodes: List<NormalizedNode>, spec: PageNodeMatchRule): Boolean {
+        if (spec.all.any { selector -> nodes.none { matchesSelector(it, selector) } }) return false
+        if (spec.any.isNotEmpty() && spec.any.none { selector -> nodes.any { matchesSelector(it, selector) } }) {
+            return false
+        }
+        return spec.none.none { selector -> nodes.any { matchesSelector(it, selector) } }
+    }
+
+    private fun resolveScope(
+        pageNodes: List<NormalizedNode>,
+        scope: ContainerScopeRule?,
+    ): List<NormalizedNode>? {
+        if (scope == null) return pageNodes
+        val byIndex = pageNodes.associateBy { it.index }
+        val containers = when {
+            scope.anchor != null -> pageNodes
+                .filter { matchesSelector(it, scope.anchor) }
+                .mapNotNull { node -> ancestor(node, scope.ancestorLevels, byIndex) }
+                .filter { container -> scope.selector?.let { matchesSelector(container, it) } ?: true }
+            scope.selector != null -> pageNodes.filter { matchesSelector(it, scope.selector) }
+            else -> emptyList()
+        }.distinctBy { it.index }
+        val container = containers.singleOrNull() ?: return null
+        return pageNodes.filter { it.index == container.index || isDescendantOf(it, container, byIndex) }
+    }
+
+    private fun ancestor(
+        node: NormalizedNode,
+        levels: Int,
+        byIndex: Map<Int, NormalizedNode>,
+    ): NormalizedNode? {
+        var current = node
+        repeat(levels) {
+            current = current.parentIndex?.let(byIndex::get) ?: return null
+        }
+        return current
+    }
+
+    private fun resolveRelativeNodes(
+        scopeNodes: List<NormalizedNode>,
+        spec: RelativeNodeRule,
+        pageNodes: List<NormalizedNode>,
+    ): List<NormalizedNode>? {
+        val targets = scopeNodes.filter { matchesSelector(it, spec.selector) }
+        val references = spec.relativeTo?.let { selector ->
+            scopeNodes.filter { matchesSelector(it, selector) }
+        }.orEmpty()
+        val byIndex = pageNodes.associateBy { it.index }
+        val related = if (spec.relation == "any") targets else targets.filter { target ->
+            references.any { reference -> isRelated(target, reference, spec.relation, byIndex) }
+        }
+        val distinct = related.distinctBy { it.index }
+        if (distinct.isEmpty() || (spec.requireUnique && distinct.size != 1)) return null
+        return distinct
+    }
+
+    private fun isRelated(
+        target: NormalizedNode,
+        reference: NormalizedNode,
+        relation: String,
+        byIndex: Map<Int, NormalizedNode>,
+    ): Boolean = when (relation) {
+        "self" -> target.index == reference.index
+        "child" -> target.parentIndex == reference.index
+        "descendant" -> isDescendantOf(target, reference, byIndex)
+        "sibling" -> target.index != reference.index && target.parentIndex == reference.parentIndex
+        "followingSibling" -> target.index > reference.index && target.parentIndex == reference.parentIndex
+        "following" -> target.index > reference.index
+        "ancestor" -> isDescendantOf(reference, target, byIndex)
+        else -> true
+    }
+
+    private fun isDescendantOf(
+        node: NormalizedNode,
+        ancestor: NormalizedNode,
+        byIndex: Map<Int, NormalizedNode>,
+    ): Boolean {
+        var parent = node.parentIndex
+        while (parent != null) {
+            if (parent == ancestor.index) return true
+            parent = byIndex[parent]?.parentIndex
+        }
+        return false
+    }
+
+    private fun matchesSelector(node: NormalizedNode, selector: NodeSelector): Boolean {
+        fun matchesValue(
+            value: String?,
+            equals: List<String>,
+            contains: List<String>,
+            regexes: List<String>,
+        ): Boolean {
+            if (equals.isEmpty() && contains.isEmpty() && regexes.isEmpty()) return true
+            val actual = value ?: return false
+            return (equals.isEmpty() || equals.any(actual::equals)) &&
+                (contains.isEmpty() || contains.any(actual::contains)) &&
+                (regexes.isEmpty() || regexes.any { compiledRegex(it).containsMatchIn(actual) })
+        }
+        return matchesValue(node.text, selector.textEquals, selector.textContains, selector.textRegexes) &&
+            matchesValue(
+                node.contentDescription,
+                selector.descriptionEquals,
+                selector.descriptionContains,
+                selector.descriptionRegexes,
+            ) &&
+            matchesValue(node.viewId, selector.viewIdEquals, selector.viewIdContains, selector.viewIdRegexes) &&
+            (selector.classNameEquals.isEmpty() || selector.classNameEquals.any { it == node.className })
+    }
+
+    private fun extractAmounts(raw: String, spec: AmountExtractionRule): List<String> {
+        val text = raw.replace(",", "")
+        return spec.regexes.map(::compiledRegex).flatMap { regex ->
+            regex.findAll(text).mapNotNull { match ->
+                match.capturedValue().let(::normalizedAmount)
+            }
+        }.distinct()
+    }
+
+    private fun extractNodeValue(node: NormalizedNode, spec: FieldExtractionRule): String? {
+        val raw = node.searchableText.trim()
+        spec.regexes.map(::compiledRegex).forEach { regex ->
+            regex.find(raw)?.capturedValue()?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
+        }
+        return raw.takeIf { it.isNotBlank() }
     }
 
     private fun extractLabelValue(
@@ -290,6 +472,8 @@ internal class PaymentRecognitionEngine(
 
     companion object {
         private const val MAX_FIELD_LENGTH = 200
+        private const val MAX_LOADING_PLACEHOLDER_NODES = 3
+        private val LOADING_PAGE_TEXTS = listOf("加载中", "正在加载", "请稍候", "请稍后")
         private val MAX_AMOUNT = BigDecimal("9999999.99")
         private val DEFAULT_NUMBER_REGEX = Regex("([0-9]{1,7}(?:\\.[0-9]{1,2})?)")
         private val DEFAULT_AMOUNT_REGEXES = listOf(
